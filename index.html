@@ -266,6 +266,26 @@
   .hr.now .t{color:var(--ink);font-weight:700}
   .hr.peak .s{color:var(--hot);font-weight:700}
   .hr.peak .col{box-shadow:0 0 0 2px var(--hot)}
+  /* feeding times (solunar) */
+  .sol-head{display:flex;align-items:center;gap:14px;margin:2px 0 14px}
+  .sol-moon{flex:0 0 auto;filter:drop-shadow(0 1px 2px rgba(9,58,82,.25))}
+  .sol-meta{flex:1 1 auto;min-width:0}
+  .sol-phase{font-family:"Saira Condensed",system-ui,sans-serif;font-size:21px;letter-spacing:.02em;line-height:1.05}
+  .sol-sub{font-size:12.5px;color:var(--ink-soft);margin-top:3px}
+  .sol-stars{margin-top:4px;font-size:16px;letter-spacing:1px}
+  .sol-stars .on{color:var(--hot)} .sol-stars .off{color:var(--line-strong)}
+  .sol-wins{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .sol-win{display:flex;align-items:center;gap:11px;padding:9px 11px;border:1.5px solid var(--line);border-radius:11px;background:var(--paper2)}
+  .sol-win.active{border-color:var(--hot);box-shadow:inset 0 0 0 1.5px var(--hot);background:var(--card)}
+  .sol-win .wt{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-family:"Saira Condensed",system-ui,sans-serif;font-weight:700;font-size:16px;color:#fff}
+  .sol-win .wt.major{background:var(--hot)} .sol-win .wt.minor{background:var(--shallow)}
+  .sol-win .wl{flex:1 1 auto;min-width:0}
+  .sol-win .wl b{font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:16px}
+  .sol-win .wl .wmeta{font-size:12.5px;color:var(--ink-soft)}
+  .sol-win .wrange{flex:0 0 auto;font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-soft);text-align:right;white-space:nowrap}
+  .sol-win.active .wrange{color:var(--hot);font-weight:600}
+  .sol-now{font-size:14px;margin:11px 0 0;font-weight:700;color:var(--deep-2)}
+  .sol-now small{display:block;font-weight:400;color:var(--ink-soft);margin-top:1px}
 
   /* keep / release verdict */
   .verdict-box{border:2px solid var(--line-strong);border-left-width:7px;border-radius:12px;padding:13px 15px;margin-top:14px}
@@ -419,6 +439,21 @@
         <h2>When to go today</h2>
         <p class="hours-sum" id="hoursSum"><span class="skeleton" style="display:block;width:70%"></span></p>
         <div class="hours" id="hours" role="img" aria-label="Hourly bite forecast for the next several hours"></div>
+      </div>
+
+      <div class="card" id="solCard" hidden>
+        <p class="eyebrow">Feeding times — today</p>
+        <div class="sol-head">
+          <svg class="sol-moon" id="solMoon" width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Moon phase"></svg>
+          <div class="sol-meta">
+            <div class="sol-phase" id="solPhase">—</div>
+            <div class="sol-sub" id="solSub"></div>
+            <div class="sol-stars" id="solStars"></div>
+          </div>
+        </div>
+        <ul class="sol-wins" id="solWins"></ul>
+        <p class="sol-now" id="solNow"></p>
+        <p class="note">Solunar theory ties feeding to the moon&rsquo;s position &mdash; <b>major</b> windows when it&rsquo;s overhead or underfoot (~2 hrs), <b>minor</b> windows at moonrise and moonset (~1 hr). A timing guide, strongest near the new and full moon. Stack it with weather and low light. Works offline.</p>
       </div>
 
       <div class="card">
@@ -616,6 +651,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.4.0/suncalc.min.js"></script>
 <script>
 "use strict";
 /* register service worker (makes the app installable + work offline) */
@@ -638,6 +674,7 @@ async function sset(key,val){
 var state = {
   loc:{lat:41.51,lon:-81.71,name:"Lake Erie — Cleveland"},
   weather:null,
+  sol:null,
   spots:[],
   catches:[],
   sun:false,
@@ -831,6 +868,7 @@ async function fetchWeather(){
     renderNow(d);
   }catch(e){
     state.weather=null;
+    renderSolunar();
     $("#scoreNum").textContent="—"; $("#verdict").textContent="No data";
     $("#metrics").innerHTML="";
     $("#factors").innerHTML="";
@@ -852,6 +890,7 @@ function compass(deg){ return DIRS[Math.round((deg%360)/22.5)%16]; }
 function opp(deg){ return (deg+180)%360; }
 
 function renderNow(d){
+  renderSolunar();
   var c=d.current;
   var hours=d.hourly.time, press=d.hourly.surface_pressure;
   // find current index
@@ -882,7 +921,8 @@ function renderNow(d){
     lowLight: lowLight<=75,
     overcastDay: isDay && c.cloud_cover>=65 && lowLight>75,
     brightDay: isDay && c.cloud_cover<25 && lowLight>75,
-    wind:w, lightRain:lightRain, stormSoon:stormSoon
+    wind:w, lightRain:lightRain, stormSoon:stormSoon,
+    solunar: solunarAt(new Date(), state.sol)
   }));
 
   // ----- metrics -----
@@ -936,7 +976,7 @@ function renderHours(d, idx){
     var pair=DAYMAP[dkey];
     var isDay=pair?(t>=pair.r && t<=pair.s):(t.getHours()>=7 && t.getHours()<=19);
     var cloud=h.cloud_cover[i], wind=h.wind_speed_10m[i], wc=h.weather_code[i];
-    return computeBite({trend:trend, lowLight:ll<=75, overcastDay:isDay&&cloud>=65&&ll>75, brightDay:isDay&&cloud<25&&ll>75, wind:wind, lightRain:[51,53,55,61,63,80,81].indexOf(wc)>=0, stormSoon:[95,96,99].indexOf(wc)>=0});
+    return computeBite({trend:trend, lowLight:ll<=75, overcastDay:isDay&&cloud>=65&&ll>75, brightDay:isDay&&cloud<25&&ll>75, wind:wind, lightRain:[51,53,55,61,63,80,81].indexOf(wc)>=0, stormSoon:[95,96,99].indexOf(wc)>=0, solunar:solunarAt(t, state.sol)});
   }
   var N=Math.min(idx+16, h.time.length), arr=[];
   for(var i=idx;i<N;i++){ var b=score(i); arr.push({i:i, t:new Date(h.time[i]), score:b.score, v:b.verdict}); }
@@ -957,6 +997,98 @@ function renderHours(d, idx){
   }
 }
 function fmtHour(d){ var h=d.getHours(), ap=h>=12?"p":"a"; h=h%12||12; return h+ap; }
+
+/* ---------------- solunar feeding times (moon-based, works offline) ---------------- */
+function moonName(ph){
+  if(ph<0.03||ph>0.97) return "New moon";
+  if(ph<0.22) return "Waxing crescent";
+  if(ph<0.28) return "First quarter";
+  if(ph<0.47) return "Waxing gibbous";
+  if(ph<0.53) return "Full moon";
+  if(ph<0.72) return "Waning gibbous";
+  if(ph<0.78) return "Last quarter";
+  return "Waning crescent";
+}
+function computeSolunar(date, lat, lon){
+  if(typeof SunCalc==="undefined") return null;
+  var ill=SunCalc.getMoonIllumination(date);
+  var mt=SunCalc.getMoonTimes(date, lat, lon);
+  // scan the local day for moon's highest point (overhead) and lowest (underfoot)
+  var start=new Date(date); start.setHours(0,0,0,0);
+  var upT=null,loT=null,upA=-99,loA=99;
+  for(var m=0;m<=1440;m+=6){
+    var t=new Date(start.getTime()+m*60000);
+    var a=SunCalc.getMoonPosition(t, lat, lon).altitude;
+    if(a>upA){upA=a;upT=t;}
+    if(a<loA){loA=a;loT=t;}
+  }
+  function win(center,half,type,label,meta){
+    return {type:type,label:label,meta:meta,center:center,
+      start:new Date(center.getTime()-half*60000), end:new Date(center.getTime()+half*60000)};
+  }
+  var wins=[];
+  if(upT) wins.push(win(upT,60,"major","Major","Moon overhead"));
+  if(loT) wins.push(win(loT,60,"major","Major","Moon underfoot"));
+  if(mt.rise) wins.push(win(mt.rise,45,"minor","Minor","Moonrise"));
+  if(mt.set) wins.push(win(mt.set,45,"minor","Minor","Moonset"));
+  wins.sort(function(a,b){return a.start-b.start;});
+  var ph=ill.phase;
+  var dist=Math.min(ph,1-ph,Math.abs(ph-0.5)); // 0 = new or full, .25 = quarter
+  var stars=Math.max(1,Math.min(4,4-Math.round(dist/0.0625)));
+  return {phase:ph, illum:ill.fraction, phaseName:moonName(ph), stars:stars,
+          wins:wins, rise:mt.rise||null, set:mt.set||null};
+}
+function solunarAt(t, sol){
+  if(!sol) return null;
+  var ms=(t instanceof Date)?t.getTime():t, out=null;
+  sol.wins.forEach(function(w){
+    if(ms>=w.start.getTime() && ms<=w.end.getTime()){ if(w.type==="major") out="major"; else if(out!=="major") out="minor"; }
+  });
+  return out;
+}
+function drawMoon(svg, phase, frac){
+  var r=26, cx=30, cy=30, top=cy-r, bot=cy+r;
+  var waxing = phase<=0.5;
+  var rx=Math.abs(r*(1-2*frac));
+  var outer = waxing?1:0;
+  var inner = waxing ? (frac<0.5?1:0) : (frac<0.5?0:1);
+  var lit='M '+cx+' '+top+' A '+r+' '+r+' 0 0 '+outer+' '+cx+' '+bot+
+          ' A '+rx.toFixed(2)+' '+r+' 0 0 '+inner+' '+cx+' '+top+' Z';
+  svg.innerHTML=
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="var(--deep-2)"/>'+
+    '<path d="'+lit+'" fill="#F2EFE0"/>'+
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--line-strong)" stroke-width="1.5"/>';
+}
+function renderSolunar(){
+  var card=$("#solCard"); if(!card) return;
+  var sol=computeSolunar(new Date(), state.loc.lat, state.loc.lon);
+  state.sol=sol;
+  if(!sol){ card.hidden=true; return; }   // SunCalc not loaded yet (cold offline) — hide gracefully
+  card.hidden=false;
+  drawMoon($("#solMoon"), sol.phase, sol.illum);
+  $("#solPhase").textContent=sol.phaseName;
+  $("#solSub").textContent=Math.round(sol.illum*100)+"% lit"+
+    (sol.rise?(" · rises "+fmtTime(sol.rise)):"")+(sol.set?(" · sets "+fmtTime(sol.set)):"");
+  var st=""; for(var i=0;i<4;i++){ st+='<span class="'+(i<sol.stars?"on":"off")+'">★</span>'; }
+  $("#solStars").innerHTML=st+' <span style="font-size:12px;color:var(--ink-soft);letter-spacing:0"> day rating</span>';
+  var now=Date.now(), active=null, next=null;
+  sol.wins.forEach(function(w){
+    if(now>=w.start.getTime()&&now<=w.end.getTime()) active=w;
+    else if(w.start.getTime()>now && !next) next=w;
+  });
+  var ul=$("#solWins"); ul.innerHTML="";
+  sol.wins.forEach(function(w){
+    var li=document.createElement('li'); li.className="sol-win"+(w===active?" active":"");
+    li.innerHTML='<span class="wt '+w.type+'">'+(w.type==="major"?"M":"m")+'</span>'+
+      '<span class="wl"><b>'+w.label+'</b><span class="wmeta"> · '+w.meta+'</span></span>'+
+      '<span class="wrange">'+fmtTime(w.start)+'–'+fmtTime(w.end)+'</span>';
+    ul.appendChild(li);
+  });
+  var nb=$("#solNow");
+  if(active){ nb.innerHTML='Feeding window active now<small>'+active.label+' period · '+active.meta.toLowerCase()+' — until '+fmtTime(active.end)+'.</small>'; }
+  else if(next){ nb.innerHTML='Next window '+fmtTime(next.start)+'<small>'+next.label+' period · '+next.meta.toLowerCase()+'.</small>'; }
+  else { nb.innerHTML=""; }
+}
 
 function setGauge(score, color){
   var len = Math.PI*130; // semicircle path length
@@ -1143,6 +1275,9 @@ function computeBite(o){
   if(o.lightRain){ score+=6; F.push(["up","Light rain","A little rain often turns fish on."]); }
   if(o.stormSoon){ score-=10; }
 
+  if(o.solunar==="major"){ score+=14; F.push(["up","Solunar major","Moon overhead or underfoot — peak feeding window."]); }
+  else if(o.solunar==="minor"){ score+=7; F.push(["up","Solunar minor","Moonrise or moonset — a secondary feeding window."]); }
+
   score=Math.max(2,Math.min(98,Math.round(score)));
   var v = score>=78?["Prime","var(--hot)"] : score>=55?["Good","var(--shallow)"] : score>=30?["Fair","var(--gold)"] : ["Slow","#6b7b85"];
   return {score:score, verdict:v, factors:F};
@@ -1170,6 +1305,7 @@ function updateWind(fromDir, w){
 /* ---------------- manual conditions ---------------- */
 function revealManual(){ var m=$("#manualCard"); m.hidden=false; m.scrollIntoView({behavior:'smooth',block:'center'}); }
 function runManual(){
+  renderSolunar();
   var sky=$("#mSky").value;
   var w=parseFloat($("#mWind").value)||0;
   var bite=computeBite({
@@ -1177,7 +1313,8 @@ function runManual(){
     lowLight: sky==="low",
     overcastDay: sky==="overcast",
     brightDay: sky==="bright",
-    wind:w, lightRain:$("#mRain").checked, stormSoon:false
+    wind:w, lightRain:$("#mRain").checked, stormSoon:false,
+    solunar: solunarAt(new Date(), state.sol)
   });
   applyBite(bite);
   $("#alertSlot").innerHTML="";
