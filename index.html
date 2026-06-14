@@ -195,6 +195,7 @@
   .sheet-actions{display:flex;gap:10px}
   .sheet-actions .btn{flex:1}
   .leaflet-container{font-family:inherit}
+  .tag-oh{display:inline-block;font-family:"Saira Condensed",system-ui,sans-serif;font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--deep);color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle;margin-left:6px}
   .spotpin{font-size:13px;line-height:1.4}
   .spotpin b{font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:15px}
 
@@ -600,11 +601,19 @@
     <section class="panel" id="panel-regs" role="tabpanel" aria-labelledby="tab-regs" hidden>
       <div class="alert calm" style="border-color:var(--deep);background:var(--paper2);color:var(--ink)">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--deep)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-        <div><strong>Verify before you go.</strong> Ohio rules run March 1 → Feb 28 and change yearly. Limits below are general statewide <em>inland</em> guidance for the 2026–27 season — <strong>Lake Erie and many specific waters differ.</strong> ODNR is the law; this app is not.</div>
+        <div><strong>Verify before you go.</strong> Fishing rules are set by each state and change every year. Your state's wildlife agency is the law — this app just points you to it. A license is required almost everywhere for anglers 16 and older.</div>
       </div>
 
-      <div class="card">
-        <h2>Keep or release?</h2>
+      <div class="card" id="stateCard">
+        <h2>Your state</h2>
+        <label class="field" style="margin-bottom:8px"><span class="lab">State</span><select id="stateSel"></select></label>
+        <p class="muted tiny" id="stateAgency" style="margin:0 0 12px"></p>
+        <ul class="linklist" id="stateLinks"></ul>
+        <p class="note" id="stateNote">Auto-detected from your location when possible — change it any time. These links open the official license system and current regulations for the state you pick.</p>
+      </div>
+
+      <div class="card" id="krCard">
+        <h2>Keep or release? <span class="tag-oh">Ohio</span></h2>
         <div class="seg" role="group" aria-label="Water type" style="margin-bottom:12px">
           <button id="krInland" type="button" data-water="inland" aria-pressed="true">Inland</button>
           <button id="krErie" type="button" data-water="erie" aria-pressed="false">Lake Erie</button>
@@ -615,19 +624,8 @@
         <div id="krResult"></div>
       </div>
 
-      <div class="card">
-        <h2>Official sources</h2>
-        <ul class="linklist">
-          <li><a href="https://ohiodnr.gov/discover-and-learn/seasons-and-regulations/fishing-regulations" target="_blank" rel="noopener">ODNR Fishing Regulations<span class="arr">↗</span></a></li>
-          <li><a href="https://ohiodnr.gov/discover-and-learn/seasons-and-regulations/fishing-licenses" target="_blank" rel="noopener">Licenses &amp; Lake Erie permit<span class="arr">↗</span></a></li>
-          <li><a href="https://www.takemefishing.org/ohio/" target="_blank" rel="noopener">Take Me Fishing — Ohio (where to fish)<span class="arr">↗</span></a></li>
-          <li><a href="https://eregulations.com/ohio/fishing" target="_blank" rel="noopener">Digital regulations digest<span class="arr">↗</span></a></li>
-        </ul>
-        <p class="note">Free fishing days for residents: <strong>June 20–21, 2026</strong> (no license needed, but all size and bag limits still apply). A license is required for anglers 16+. Questions: 1-800-WILDLIFE (1-800-945-3543).</p>
-      </div>
-
-      <div class="card">
-        <h2>Common inland limits</h2>
+      <div class="card" id="limitsCard">
+        <h2>Common inland limits <span class="tag-oh">Ohio</span></h2>
         <table class="reg-table">
           <thead><tr><th>Species</th><th>Daily bag</th><th>Min size</th></tr></thead>
           <tbody>
@@ -639,14 +637,25 @@
             <tr><td>Crappie &amp; other panfish</td><td>varies</td><td>varies</td></tr>
           </tbody>
         </table>
-        <p class="note">*The 15" walleye/saugeye minimum was removed on several inland lakes for 2026–27 — confirm your water. Lake Erie sets its own walleye, perch, and bass seasons and limits by zone. Protected species (lake sturgeon, several gars, cisco, and more) must be released immediately.</p>
+        <p class="note">*The 15" walleye/saugeye minimum was removed on several inland lakes for 2026–27 — confirm your water. Lake Erie sets its own walleye, perch, and bass seasons and limits by zone. Ohio resident free fishing days: <strong>June 20–21, 2026</strong> (size and bag limits still apply). Protected species (lake sturgeon, several gars, cisco, and more) must be released immediately.</p>
+      </div>
+
+      <div class="card" id="measureCard" hidden>
+        <h2>Measure &amp; decide</h2>
+        <p>We keep a detailed keep-or-release checker for Ohio, the home water. Everywhere else, size and daily-bag limits vary by state — and often by individual lake — so check your state's current regulations with the link above before keeping a fish. The rules of thumb hold everywhere:</p>
+        <ul class="checklist" style="margin-top:10px">
+          <li><span class="bx"></span><span>Measure flat: tip of the mouth to the tip of the tail.</span></li>
+          <li><span class="bx"></span><span>If it's close to the minimum, under it, or you're unsure — release it gently.</span></li>
+          <li><span class="bx"></span><span>Know the daily bag and any closed seasons before you go; keep only what you'll use.</span></li>
+          <li><span class="bx"></span><span>Release any protected or out-of-season species right away.</span></li>
+        </ul>
       </div>
 
       <div class="card">
         <h2>Pre-trip checklist</h2>
         <ul class="checklist">
-          <li><span class="bx"></span><span>Current fishing license on you (plus Lake Erie permit if fishing Erie or its tributaries)</span></li>
-          <li><span class="bx"></span><span>Checked seasons &amp; bag/size limits for <em>this</em> water on ODNR</span></li>
+          <li><span class="bx"></span><span>Current fishing license on you (plus any special permits — trout/salmon stamp, Great Lakes permit, etc.)</span></li>
+          <li><span class="bx"></span><span>Checked seasons &amp; bag/size limits for <em>this</em> water with your state's wildlife agency</span></li>
           <li><span class="bx"></span><span>Life jacket per person; check the marine/lake forecast for wind &amp; storms</span></li>
           <li><span class="bx"></span><span>Tell someone your launch point and return time</span></li>
           <li><span class="bx"></span><span>Clean, drain, dry gear between waters — stop invasive species</span></li>
@@ -760,6 +769,13 @@ var $$ = function(s,r){ return Array.prototype.slice.call((r||document).querySel
   ws.value=inferWaterType(state.loc.name);
   state.krWater="inland";
 
+  var stSel=$("#stateSel");
+  if(stSel){
+    US_STATES.forEach(function(st){ var op=document.createElement("option"); op.value=st.n; op.textContent=st.n; stSel.appendChild(op); });
+    stSel.value="Ohio";
+    renderRegsState("Ohio");
+  }
+
   buildQuickWaters();
   renderPlace();
   renderSpotList();
@@ -782,6 +798,7 @@ function showTab(name){
   // location bar only relevant to Now + Map
   $("#locbar").style.display = (name==='now'||name==='map') ? 'flex' : 'none';
   if(name==='map'){ ensureMap(); }
+  if(name==='regs'){ detectStateForLoc(); }
   window.scrollTo({top:0,behavior:'instant' in window ? 'instant':'auto'});
 }
 
@@ -819,6 +836,7 @@ function bindControls(){
   $("#krGo").addEventListener('click', runKeepRelease);
   $("#krInland").addEventListener('click', function(){ setKrWater('inland'); });
   $("#krErie").addEventListener('click', function(){ setKrWater('erie'); });
+  if($("#stateSel")) $("#stateSel").addEventListener('change', function(){ renderRegsState($("#stateSel").value); });
   $("#seasonSel").addEventListener('change', renderPicks);
   $("#waterSel").addEventListener('change', renderPicks);
 }
@@ -1484,6 +1502,101 @@ function setKrWater(w){
   $("#krInland").setAttribute('aria-pressed', String(w==="inland"));
   $("#krErie").setAttribute('aria-pressed', String(w==="erie"));
   if($("#krSpecies").value.trim()) runKeepRelease();
+}
+
+/* ---------------- state-aware regulations ---------------- */
+/* Each state shows its official wildlife agency (the authority) plus a Take Me Fishing
+   gateway page that links to that state's official license system and current regulations.
+   Ohio (home water) also carries verified direct ODNR links and the detailed checker. */
+var US_STATES=[
+  {n:"Alabama",a:"Alabama Dept. of Conservation & Natural Resources"},
+  {n:"Alaska",a:"Alaska Dept. of Fish & Game"},
+  {n:"Arizona",a:"Arizona Game & Fish Department"},
+  {n:"Arkansas",a:"Arkansas Game & Fish Commission"},
+  {n:"California",a:"California Dept. of Fish & Wildlife"},
+  {n:"Colorado",a:"Colorado Parks & Wildlife"},
+  {n:"Connecticut",a:"Connecticut Dept. of Energy & Environmental Protection"},
+  {n:"Delaware",a:"Delaware Div. of Fish & Wildlife (DNREC)"},
+  {n:"Florida",a:"Florida Fish & Wildlife Conservation Commission"},
+  {n:"Georgia",a:"Georgia DNR — Wildlife Resources Division"},
+  {n:"Hawaii",a:"Hawaii Div. of Aquatic Resources"},
+  {n:"Idaho",a:"Idaho Dept. of Fish & Game"},
+  {n:"Illinois",a:"Illinois Dept. of Natural Resources"},
+  {n:"Indiana",a:"Indiana DNR — Fish & Wildlife"},
+  {n:"Iowa",a:"Iowa Dept. of Natural Resources"},
+  {n:"Kansas",a:"Kansas Dept. of Wildlife & Parks"},
+  {n:"Kentucky",a:"Kentucky Dept. of Fish & Wildlife Resources"},
+  {n:"Louisiana",a:"Louisiana Dept. of Wildlife & Fisheries"},
+  {n:"Maine",a:"Maine Dept. of Inland Fisheries & Wildlife"},
+  {n:"Maryland",a:"Maryland Dept. of Natural Resources"},
+  {n:"Massachusetts",a:"Massachusetts Div. of Fisheries & Wildlife (MassWildlife)"},
+  {n:"Michigan",a:"Michigan Dept. of Natural Resources"},
+  {n:"Minnesota",a:"Minnesota Dept. of Natural Resources"},
+  {n:"Mississippi",a:"Mississippi Dept. of Wildlife, Fisheries & Parks"},
+  {n:"Missouri",a:"Missouri Dept. of Conservation"},
+  {n:"Montana",a:"Montana Fish, Wildlife & Parks"},
+  {n:"Nebraska",a:"Nebraska Game & Parks Commission"},
+  {n:"Nevada",a:"Nevada Dept. of Wildlife"},
+  {n:"New Hampshire",a:"New Hampshire Fish & Game Department"},
+  {n:"New Jersey",a:"New Jersey Div. of Fish & Wildlife"},
+  {n:"New Mexico",a:"New Mexico Dept. of Game & Fish"},
+  {n:"New York",a:"New York State Dept. of Environmental Conservation"},
+  {n:"North Carolina",a:"North Carolina Wildlife Resources Commission"},
+  {n:"North Dakota",a:"North Dakota Game & Fish Department"},
+  {n:"Ohio",a:"Ohio DNR — Division of Wildlife",regs:"https://ohiodnr.gov/discover-and-learn/seasons-and-regulations/fishing-regulations",lic:"https://ohiodnr.gov/discover-and-learn/seasons-and-regulations/fishing-licenses"},
+  {n:"Oklahoma",a:"Oklahoma Dept. of Wildlife Conservation"},
+  {n:"Oregon",a:"Oregon Dept. of Fish & Wildlife"},
+  {n:"Pennsylvania",a:"Pennsylvania Fish & Boat Commission"},
+  {n:"Rhode Island",a:"Rhode Island Dept. of Environmental Management"},
+  {n:"South Carolina",a:"South Carolina Dept. of Natural Resources"},
+  {n:"South Dakota",a:"South Dakota Game, Fish & Parks"},
+  {n:"Tennessee",a:"Tennessee Wildlife Resources Agency"},
+  {n:"Texas",a:"Texas Parks & Wildlife Department"},
+  {n:"Utah",a:"Utah Div. of Wildlife Resources"},
+  {n:"Vermont",a:"Vermont Fish & Wildlife Department"},
+  {n:"Virginia",a:"Virginia Dept. of Wildlife Resources"},
+  {n:"Washington",a:"Washington Dept. of Fish & Wildlife"},
+  {n:"West Virginia",a:"West Virginia Div. of Natural Resources"},
+  {n:"Wisconsin",a:"Wisconsin Dept. of Natural Resources"},
+  {n:"Wyoming",a:"Wyoming Game & Fish Department"},
+  {n:"District of Columbia",a:"DC Dept. of Energy & Environment"}
+];
+function stateSlug(n){ return n.toLowerCase().replace(/\s+/g,'-'); }
+function tmfURL(n){ return "https://www.takemefishing.org/"+stateSlug(n)+"/fishing/fishing-license/"; }
+function findState(n){ for(var i=0;i<US_STATES.length;i++){ if(US_STATES[i].n===n) return US_STATES[i]; } return null; }
+function renderRegsState(name){
+  var st=findState(name)||findState("Ohio");
+  var ag=$("#stateAgency"); if(ag) ag.innerHTML="Authority: <strong>"+escapeHTML(st.a)+"</strong>";
+  var ul=$("#stateLinks"); if(ul){
+    var links=[];
+    if(st.regs) links.push(["Official "+st.n+" fishing regulations", st.regs]);
+    if(st.lic)  links.push(["Buy a "+st.n+" license", st.lic]);
+    links.push([st.n+" license &amp; regulations — Take Me Fishing", tmfURL(st.n)]);
+    ul.innerHTML="";
+    links.forEach(function(l){
+      var li=document.createElement("li");
+      li.innerHTML='<a href="'+l[1]+'" target="_blank" rel="noopener">'+l[0]+'<span class="arr">↗</span></a>';
+      ul.appendChild(li);
+    });
+  }
+  var isOhio=(st.n==="Ohio");
+  if($("#krCard")) $("#krCard").hidden=!isOhio;
+  if($("#limitsCard")) $("#limitsCard").hidden=!isOhio;
+  if($("#measureCard")) $("#measureCard").hidden=isOhio;
+}
+function detectStateForLoc(){
+  if(!state.loc) return;
+  var lat=state.loc.lat, lon=state.loc.lon;
+  if(typeof lat!=="number"||typeof lon!=="number") return;
+  var key=lat.toFixed(2)+","+lon.toFixed(2);
+  if(state.stateDetectedKey===key) return;       // already resolved this spot
+  state.stateDetectedKey=key;
+  fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="+lat+"&lon="+lon,{headers:{"Accept":"application/json"}})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var s=d&&d.address&&d.address.state;
+      if(s&&findState(s)){ var sel=$("#stateSel"); if(sel){ sel.value=s; renderRegsState(s); } }
+    }).catch(function(){});
 }
 
 /* ---------------- where to start (season) ---------------- */
