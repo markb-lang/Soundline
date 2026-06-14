@@ -11,8 +11,8 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Soundline" />
-<meta name="description" content="A free, sun-readable Ohio fishing field guide: live bite forecast, topo maps, a catch log, and regulations." />
-<title>Soundline — Ohio waters field companion</title>
+<meta name="description" content="A free, sun-readable fishing field companion: live bite forecast, solunar feeding times, topo maps, a catch log, and your state's regulations." />
+<title>Soundline — fishing field companion</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -286,6 +286,12 @@
   .sol-win.active .wrange{color:var(--hot);font-weight:600}
   .sol-now{font-size:14px;margin:11px 0 0;font-weight:700;color:var(--deep-2)}
   .sol-now small{display:block;font-weight:400;color:var(--ink-soft);margin-top:1px}
+  .sol-rate{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;font-size:12.5px;color:var(--ink-soft);margin-left:4px}
+  .sol-best{font-size:13.5px;margin:0 0 12px;padding:10px 12px;background:var(--paper2);border:1.5px solid var(--line);border-left:4px solid var(--hot);border-radius:10px;line-height:1.45}
+  .sol-best b{font-family:"IBM Plex Mono",monospace;color:var(--deep-2)}
+  .sol-win.prime{border-color:var(--gold)}
+  .sol-win.prime.active{border-color:var(--hot)}
+  .wprime{display:block;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:11.5px;color:var(--gold);margin-top:1px}
 
   /* keep / release verdict */
   .verdict-box{border:2px solid var(--line-strong);border-left-width:7px;border-radius:12px;padding:13px 15px;margin-top:14px}
@@ -350,7 +356,7 @@
       </svg>
       <div class="brand">
         <h1 class="display">Soundline</h1>
-        <p>Read the water before you wet a line · Ohio</p>
+        <p>Read the water before you wet a line</p>
       </div>
       <button class="sun-toggle" id="sunBtn" aria-pressed="false" aria-label="Toggle high-sun high-contrast mode">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
@@ -380,7 +386,7 @@
         <span class="name display" id="placeName">Lake Erie — Cleveland</span>
         <span class="coords mono muted" id="placeCoords">41.51, -81.71</span>
       </div>
-      <div class="chips" id="quickWaters" aria-label="Quick Ohio waters"></div>
+      <div class="chips" id="quickWaters" aria-label="Quick access"></div>
 
       <div id="alertSlot"></div>
 
@@ -451,9 +457,10 @@
             <div class="sol-stars" id="solStars"></div>
           </div>
         </div>
+        <p class="sol-best" id="solBest"></p>
         <ul class="sol-wins" id="solWins"></ul>
         <p class="sol-now" id="solNow"></p>
-        <p class="note">Solunar theory ties feeding to the moon&rsquo;s position &mdash; <b>major</b> windows when it&rsquo;s overhead or underfoot (~2 hrs), <b>minor</b> windows at moonrise and moonset (~1 hr). A timing guide, strongest near the new and full moon. Stack it with weather and low light. Works offline.</p>
+        <p class="note"><b>How to use it:</b> aim a trip at one of these windows — a window that also lands at dawn or dusk (flagged ★) is the strongest call. <b>Majors</b> (~2 hrs) are when the moon is directly overhead or underfoot; <b>minors</b> (~1 hr) are moonrise and moonset. These windows are already factored into your bite score and the hourly bars above. Solunar is a timing aid, not a guarantee — it's most useful as a tiebreaker, and sharpest near the new and full moon. Works offline.</p>
       </div>
 
       <div class="card">
@@ -480,7 +487,10 @@
 
       <div class="card">
         <h2>Where to start here</h2>
-        <label class="field" style="margin-bottom:10px"><span class="lab">Season</span><select id="seasonSel"></select></label>
+        <div class="grid2" style="margin-bottom:10px">
+          <label class="field"><span class="lab">Water type</span><select id="waterSel"></select></label>
+          <label class="field"><span class="lab">Season</span><select id="seasonSel"></select></label>
+        </div>
         <p class="muted tiny" id="startCtx" style="margin:-2px 0 10px"></p>
         <ul class="picks" id="picks"></ul>
         <p class="note">New to it? The all-rounder: a slip bobber, a small split shot, a #6 hook, and a live nightcrawler fished near cover catches bluegill, perch, crappie, and more — almost anywhere, almost any season.</p>
@@ -529,7 +539,7 @@
           <label class="field"><span class="lab">Weight (lb · opt.)</span><input type="number" id="cWt" inputmode="decimal" step="0.1" min="0" placeholder="0"></label>
         </div>
         <label class="field"><span class="lab">Bait / lure</span><input type="text" id="cBait" placeholder="e.g. jig &amp; minnow, crankbait"></label>
-        <label class="field"><span class="lab">Water</span><input type="text" id="cWater" placeholder="e.g. Lake Erie, Alum Creek"></label>
+        <label class="field"><span class="lab">Water</span><input type="text" id="cWater" placeholder="e.g. the lake, river, or pond"></label>
         <label class="field"><span class="lab">Notes</span><textarea id="cNotes" placeholder="Depth, structure, how it hit…"></textarea></label>
         <div class="checkrow">
           <input type="checkbox" id="cAttach" checked>
@@ -681,17 +691,6 @@ var state = {
   map:null, layer:null, layerKey:"topo", spotLayer:null, meMarker:null, mapReady:false
 };
 
-var QUICK = [
-  {n:"Lake Erie — Cleveland",lat:41.51,lon:-81.71},
-  {n:"Lake Erie — Sandusky Bay",lat:41.46,lon:-82.71},
-  {n:"Maumee River — Toledo",lat:41.58,lon:-83.68},
-  {n:"Alum Creek Lake",lat:40.21,lon:-82.98},
-  {n:"Caesar Creek Lake",lat:39.49,lon:-84.06},
-  {n:"Mosquito Creek Lake",lat:41.30,lon:-80.76},
-  {n:"Salt Fork Lake",lat:40.10,lon:-81.45},
-  {n:"Hoover Reservoir",lat:40.13,lon:-82.87}
-];
-
 var SPECIES = ["Walleye","Saugeye","Sauger","Yellow Perch","Smallmouth Bass","Largemouth Bass","Spotted Bass","White Bass","Black Crappie","White Crappie","Bluegill","Channel Catfish","Flathead Catfish","Blue Catfish","Muskellunge","Tiger Muskie","Northern Pike","Steelhead","Rainbow Trout","Brown Trout","Brook Trout","Freshwater Drum","Rock Bass","Bullhead"];
 
 var $ = function(s,r){ return (r||document).querySelector(s); };
@@ -714,6 +713,12 @@ var $$ = function(s,r){ return Array.prototype.slice.call((r||document).querySel
     var op=document.createElement("option"); op.value=o[0]; op.textContent=o[1]; ss.appendChild(op);
   });
   ss.value=currentSeason();
+  // water-type selector for "where to start"
+  var ws=$("#waterSel");
+  [["lake","Lake / pond"],["river","River / stream"],["greatlake","Great Lake / big lake"]].forEach(function(o){
+    var op=document.createElement("option"); op.value=o[0]; op.textContent=o[1]; ws.appendChild(op);
+  });
+  ws.value=inferWaterType(state.loc.name);
   state.krWater="inland";
 
   buildQuickWaters();
@@ -768,6 +773,7 @@ function bindControls(){
   $("#krInland").addEventListener('click', function(){ setKrWater('inland'); });
   $("#krErie").addEventListener('click', function(){ setKrWater('erie'); });
   $("#seasonSel").addEventListener('change', renderPicks);
+  $("#waterSel").addEventListener('change', renderPicks);
 }
 function applySun(){
   document.documentElement.setAttribute('data-sun', state.sun?'on':'off');
@@ -776,18 +782,33 @@ function applySun(){
 
 function buildQuickWaters(){
   var wrap=$("#quickWaters"); wrap.innerHTML="";
-  QUICK.forEach(function(q){
+  var geo=document.createElement('button');
+  geo.className="chip water"; geo.type="button";
+  geo.innerHTML='\uD83D\uDCCD Near me';
+  geo.title="Use my current location";
+  geo.addEventListener('click', useGeo);
+  wrap.appendChild(geo);
+  state.spots.slice().reverse().forEach(function(sp){
     var b=document.createElement('button');
-    b.className="chip water"; b.type="button"; b.textContent=q.n.replace("Lake Erie — ","").replace(" Lake","").replace(" Reservoir","");
-    b.title=q.n;
-    b.addEventListener('click', function(){ setLoc(q.lat,q.lon,q.n); });
+    b.className="chip water"; b.type="button"; b.textContent=sp.label||"Saved spot";
+    b.title="Go to "+(sp.label||"saved spot");
+    b.addEventListener('click', function(){ setLoc(sp.lat, sp.lon, sp.label||"Saved spot"); });
     wrap.appendChild(b);
   });
+  if(!state.spots.length){
+    var hint=document.createElement('span');
+    hint.className="tiny muted"; hint.style.alignSelf="center"; hint.style.padding="2px 4px";
+    hint.textContent="Search a lake, river, or pond above — or drop a pin on the Map to save it here.";
+    wrap.appendChild(hint);
+  }
 }
 
 function setLoc(lat,lon,name){
   state.loc={lat:lat,lon:lon,name:name};
-  renderPlace(); fetchWeather();
+  renderPlace();
+  var ws=$("#waterSel"); if(ws){ ws.value=inferWaterType(name); }
+  renderPicks();
+  fetchWeather();
   if(state.mapReady && state.map){ state.map.setView([lat,lon], Math.max(state.map.getZoom(),11)); }
 }
 function renderPlace(){
@@ -952,7 +973,7 @@ function renderNow(d){
   if(stormSoon){
     slot.innerHTML='<div class="alert"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg><div><strong>Storms in the forecast.</strong> Thunder is expected within hours. Get off open water before it arrives — no fish is worth a lightning risk.</div></div>';
   } else if(c.wind_gusts_10m>=28){
-    slot.innerHTML='<div class="alert calm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h9a2.5 2.5 0 1 1-2.5 2.5"/></svg><div><strong>Strong gusts.</strong> Gusting to '+Math.round(c.wind_gusts_10m)+' mph — small craft and casting will be rough, especially on Lake Erie. Fish protected shorelines.</div></div>';
+    slot.innerHTML='<div class="alert calm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h9a2.5 2.5 0 1 1-2.5 2.5"/></svg><div><strong>Strong gusts.</strong> Gusting to '+Math.round(c.wind_gusts_10m)+' mph — small craft and casting will be rough. Fish protected, downwind shorelines.</div></div>';
   }
   renderHours(d, idx);
   renderPicks();
@@ -1032,11 +1053,28 @@ function computeSolunar(date, lat, lon){
   if(mt.rise) wins.push(win(mt.rise,45,"minor","Minor","Moonrise"));
   if(mt.set) wins.push(win(mt.set,45,"minor","Minor","Moonset"));
   wins.sort(function(a,b){return a.start-b.start;});
+  // sun times (offline) to flag windows that overlap dawn/dusk — the strongest signal
+  var sun={}; try{ sun=SunCalc.getTimes(date, lat, lon); }catch(e){}
+  function nearLight(w){
+    var pad=45*60000; // window counts as "prime" if first/last light falls within 45 min of it
+    function hit(x){ return x && !isNaN(x.getTime()) && x.getTime()>=w.start.getTime()-pad && x.getTime()<=w.end.getTime()+pad; }
+    if(hit(sun.sunrise)) return "first light";
+    if(hit(sun.sunset)) return "last light";
+    return null;
+  }
+  wins.forEach(function(w){ w.light=nearLight(w); w.prime=!!w.light; });
+  // best window today: a prime major > prime minor > any major > first window
+  var best=null;
+  wins.forEach(function(w){
+    function rank(x){ return (x.prime?2:0) + (x.type==="major"?1:0); }
+    if(!best || rank(w)>rank(best)) best=w;
+  });
   var ph=ill.phase;
   var dist=Math.min(ph,1-ph,Math.abs(ph-0.5)); // 0 = new or full, .25 = quarter
   var stars=Math.max(1,Math.min(4,4-Math.round(dist/0.0625)));
-  return {phase:ph, illum:ill.fraction, phaseName:moonName(ph), stars:stars,
-          wins:wins, rise:mt.rise||null, set:mt.set||null};
+  var rateWord=["","weak","fair","good","strong"][stars];
+  return {phase:ph, illum:ill.fraction, phaseName:moonName(ph), stars:stars, rateWord:rateWord,
+          wins:wins, best:best, rise:mt.rise||null, set:mt.set||null};
 }
 function solunarAt(t, sol){
   if(!sol) return null;
@@ -1071,7 +1109,7 @@ function renderSolunar(){
   $("#solSub").textContent=Math.round(sol.illum*100)+"% lit"+
     (sol.rise?(" · rises "+fmtTime(sol.rise)):"")+(sol.set?(" · sets "+fmtTime(sol.set)):"");
   var st=""; for(var i=0;i<4;i++){ st+='<span class="'+(i<sol.stars?"on":"off")+'">★</span>'; }
-  $("#solStars").innerHTML=st+' <span style="font-size:12px;color:var(--ink-soft);letter-spacing:0"> day rating</span>';
+  $("#solStars").innerHTML=st+' <span class="sol-rate">'+sol.rateWord+' day for feeding</span>';
   var now=Date.now(), active=null, next=null;
   sol.wins.forEach(function(w){
     if(now>=w.start.getTime()&&now<=w.end.getTime()) active=w;
@@ -1079,14 +1117,21 @@ function renderSolunar(){
   });
   var ul=$("#solWins"); ul.innerHTML="";
   sol.wins.forEach(function(w){
-    var li=document.createElement('li'); li.className="sol-win"+(w===active?" active":"");
+    var li=document.createElement('li'); li.className="sol-win"+(w===active?" active":"")+(w.prime?" prime":"");
     li.innerHTML='<span class="wt '+w.type+'">'+(w.type==="major"?"M":"m")+'</span>'+
-      '<span class="wl"><b>'+w.label+'</b><span class="wmeta"> · '+w.meta+'</span></span>'+
+      '<span class="wl"><b>'+w.label+'</b><span class="wmeta"> · '+w.meta+'</span>'+
+        (w.prime?'<span class="wprime">★ lines up with '+w.light+'</span>':'')+'</span>'+
       '<span class="wrange">'+fmtTime(w.start)+'–'+fmtTime(w.end)+'</span>';
     ul.appendChild(li);
   });
+  // Best bet today
+  var bb=$("#solBest"), b=sol.best;
+  if(b){
+    bb.innerHTML='Best bet today: <b>'+fmtTime(b.start)+'–'+fmtTime(b.end)+'</b> ('+b.label.toLowerCase()+' · '+b.meta.toLowerCase()+')'+
+      (b.prime?' — it overlaps '+b.light+', the strongest combination.':'. If you can fish once, aim for a window that also falls at dawn or dusk.');
+  } else { bb.innerHTML=""; }
   var nb=$("#solNow");
-  if(active){ nb.innerHTML='Feeding window active now<small>'+active.label+' period · '+active.meta.toLowerCase()+' — until '+fmtTime(active.end)+'.</small>'; }
+  if(active){ nb.innerHTML='Feeding window active right now<small>'+active.label+' period · '+active.meta.toLowerCase()+' — until '+fmtTime(active.end)+'.</small>'; }
   else if(next){ nb.innerHTML='Next window '+fmtTime(next.start)+'<small>'+next.label+' period · '+next.meta.toLowerCase()+'.</small>'; }
   else { nb.innerHTML=""; }
   }catch(e){ state.sol=null; card.hidden=true; }  // feeding times must never break the core forecast
@@ -1159,7 +1204,7 @@ function promptSpot(lat,lon){
   var ti = parseInt(typeIdx,10); if(isNaN(ti)||ti<1||ti>6) ti=5; ti=ti-1;
   var sp={id:Date.now(), lat:lat, lon:lon, label:label, type:SPOT_TYPES[ti][0], color:SPOT_TYPES[ti][1]};
   state.spots.push(sp); sset("spots",state.spots);
-  drawSpots(); renderSpotList();
+  drawSpots(); renderSpotList(); buildQuickWaters();
 }
 function drawSpots(){
   if(!state.spotLayer) return;
@@ -1186,7 +1231,7 @@ function renderSpotList(){
     var btns=li.querySelectorAll('button');
     btns[0].addEventListener('click', function(){ showTab('map'); ensureMap(); if(state.map) state.map.setView([sp.lat,sp.lon],14); });
     btns[1].addEventListener('click', function(){ setLoc(sp.lat,sp.lon,sp.label); showTab('now'); });
-    btns[2].addEventListener('click', function(){ state.spots=state.spots.filter(function(x){return x.id!==sp.id;}); sset("spots",state.spots); drawSpots(); renderSpotList(); });
+    btns[2].addEventListener('click', function(){ state.spots=state.spots.filter(function(x){return x.id!==sp.id;}); sset("spots",state.spots); drawSpots(); renderSpotList(); buildQuickWaters(); });
     ul.appendChild(li);
   });
 }
@@ -1376,42 +1421,82 @@ function setKrWater(w){
 }
 
 /* ---------------- where to start (season) ---------------- */
-var SEASONS={
-  spring:{label:"spring", picks:[
-    ["Crappie & bluegill","Slip bobber with a small minnow or worm, fished tight to shallow brush, docks, and flooded cover as the water warms."],
-    ["Saugeye & walleye","A jig tipped with a minnow or twister tail, worked slow below dams and along rocky points."],
-    ["Largemouth bass","Soft plastics or a spinnerbait around the first weeds and wood as bass move shallow."]
-  ]},
-  summer:{label:"summer", picks:[
+var START={
+  lake:{ label:"lakes & ponds", spring:[
+    ["Crappie & bluegill","Slip bobber with a small minnow or worm, tight to shallow brush, docks, and flooded cover as the water warms."],
+    ["Largemouth bass","Soft plastics or a spinnerbait around the first weeds and wood as bass move shallow to spawn."],
+    ["Stocked trout (where present)","Many states stock lakes in spring — PowerBait or a small spinner off the bank."]
+  ], summer:[
     ["Bluegill & bass","Topwater or a bobber-and-worm at dawn and dusk near cover; midday, go deeper or to shade."],
     ["Channel catfish","Cut bait, chicken liver, or nightcrawlers on the bottom after dark — forgiving and hard-fighting."],
-    ["Crappie","Find them deeper now, around brush piles and bridge pilings, on small jigs."]
-  ]},
-  fall:{label:"fall", picks:[
-    ["Bass & walleye","Fish feed up for winter — crankbaits and jigs over points and flats, best on falling pressure."],
+    ["Crappie","Holding deeper now around brush piles, standing timber, and bridge pilings — small jigs."]
+  ], fall:[
+    ["Bass","Fish feed up for winter — crankbaits and jigs over points and flats, best on falling pressure."],
     ["Crappie","Schools tighten around cover; a jig under a bobber fills the bucket."],
-    ["Saugeye","Reservoir saugeye turn on again — jigs and crankbaits near dams and current."]
+    ["Catfish","Still active before cold sets in — cut bait on the bottom near drop-offs."]
+  ], winter:[
+    ["Crappie & panfish","Slow way down with small jigs fished deep; through the ice only where it's confirmed safe."],
+    ["Bass (finesse)","Lethargic and deep — a slow jig or drop-shot worked on the bottom."],
+    ["Stocked trout (where present)","Cool-season stockings off the bank with bait or small spinners."]
   ]},
-  winter:{label:"winter", picks:[
-    ["Saugeye","Below spillways and dams on slow jigs and blade baits — an Ohio cold-water staple."],
-    ["Panfish","Slow way down with small jigs deep; ice fish only where the ice is confirmed safe."],
-    ["Stocked trout","ODNR stocks ponds and lakes in cool months — PowerBait or small spinners off the bank."]
+  river:{ label:"rivers & streams", spring:[
+    ["Walleye / sauger","Spring runs stack below dams and in current seams — jigs tipped with a minnow or twister."],
+    ["Smallmouth bass","Soft plastics and small crankbaits around current breaks, rock, and eddies."],
+    ["Catfish","Warming, higher water turns them on — cut bait on the bottom in holes and behind cover."]
+  ], summer:[
+    ["Smallmouth bass","Topwater early, then tubes and crankbaits in riffles, current seams, and shade."],
+    ["Channel & flathead catfish","Bottom-fish deep holes after dark with cut or live bait."],
+    ["Panfish & rock bass","A worm under a float drifted along the bank — steady action, great for kids."]
+  ], fall:[
+    ["Smallmouth bass","Aggressive pre-winter feeding — jerkbaits and jigs through deeper pools."],
+    ["Walleye / sauger","Moving toward wintering holes near dams — vertical jigging works."],
+    ["Catfish","Still feeding on the bottom in the deeper, slower stretches."]
+  ], winter:[
+    ["Sauger / walleye","Below spillways and dams on slow jigs and blade baits — a cold-water staple."],
+    ["Trout (tailwaters/streams)","Where present, small nymphs, eggs, or spinners in slow seams."],
+    ["Panfish (finesse)","Slow presentations in deeper, slack-water pockets out of the main current."]
+  ]},
+  greatlake:{ label:"big lakes", spring:[
+    ["Walleye","Following warming water and bait — cast or troll near river mouths and shorelines."],
+    ["Yellow perch","Schools near structure — a perch rig with minnows fished near the bottom."],
+    ["Steelhead / trout","Staging near tributary mouths and harbors — spawn sacs, spinners, or trolled spoons."]
+  ], summer:[
+    ["Walleye","Out over open water following bait — troll crankbaits or worm harnesses to cover water."],
+    ["Yellow perch","A classic — perch rigs with minnows over mud and gravel flats."],
+    ["Smallmouth bass","Rocky points, reefs, and breakwalls — tubes, drop-shots, and jerkbaits."]
+  ], fall:[
+    ["Walleye","Big fall fish move shallow — cast or troll near shore, especially in low light."],
+    ["Steelhead / salmon","Running the tributaries — drift spawn, jigs, or spinners in the current."],
+    ["Smallmouth bass","Feeding hard on rock structure before winter — jigs and blade baits."]
+  ], winter:[
+    ["Yellow perch","Through safe ice or from harbors — minnows and small jigging spoons."],
+    ["Walleye","Near-shore and harbor fish on blade baits and spoons; ice only where confirmed safe."],
+    ["Steelhead","Tributaries and harbors stay productive in cold water — float-fished bait or jigs."]
   ]}
 };
+function inferWaterType(name){
+  var s=(name||"").toLowerCase();
+  if(/lake (erie|michigan|huron|ontario|superior)|great lake|lake champlain|lake st\.? clair|lake of the woods/.test(s)) return "greatlake";
+  if(/\b(lake|reservoir|pond|impoundment)\b/.test(s)) return "lake";
+  if(/\b(river|creek|stream|brook|fork|bayou|run)\b/.test(s)) return "river";
+  return "lake";
+}
 function currentSeason(){ var m=new Date().getMonth(); return m<=1?"winter":m<=4?"spring":m<=7?"summer":m<=10?"fall":"winter"; }
 function renderPicks(){
-  var key=$("#seasonSel").value || currentSeason();
-  var s=SEASONS[key]; if(!s) return;
+  var wkey=($("#waterSel")&&$("#waterSel").value)||inferWaterType(state.loc.name);
+  var skey=($("#seasonSel")&&$("#seasonSel").value)||currentSeason();
+  var W=START[wkey]||START.lake;
+  var picks=W[skey]||W.summer;
   var ul=$("#picks"); ul.innerHTML="";
-  s.picks.forEach(function(p,i){
+  picks.forEach(function(p,i){
     var li=document.createElement('li'); li.className="pick";
     li.innerHTML='<span class="pic">'+(i+1)+'</span><div><div class="pn">'+p[0]+'</div><div class="pd">'+p[1]+'</div></div>';
     ul.appendChild(li);
   });
-  var msg="Beginner-friendly targets for "+s.label+" on Ohio waters.";
+  var msg="Typical targets for "+skey+" on "+W.label+" — general guidance for waters like this, not a guarantee a species is present.";
   if(state.weather && state.weather.current){
     var c=state.weather.current;
-    if(c.is_day===0) msg+=" It's dark out — night catfishing is a great low-pressure way to start.";
+    if(c.is_day===0) msg+=" It's dark out — night fishing the bottom is a great low-pressure way to start.";
     else if(c.cloud_cover>=65) msg+=" Overcast right now, so fish will roam shallower and stay active longer.";
     else if(c.cloud_cover<25) msg+=" Bright sun right now — fish shade, cover, and deeper water through midday.";
   }

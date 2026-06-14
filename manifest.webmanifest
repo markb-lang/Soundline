@@ -1,7 +1,7 @@
 {
-  "name": "Soundline — Ohio fishing field guide",
+  "name": "Soundline — fishing field guide",
   "short_name": "Soundline",
-  "description": "A free, sun-readable Ohio fishing field guide: live bite forecast, topo maps, a catch log, and regulations.",
+  "description": "A free, sun-readable fishing field companion: live bite forecast, solunar feeding times, topo maps, a catch log, and regulations.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
