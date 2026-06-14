@@ -19,13 +19,13 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <style>
   :root{
-    --paper:#EFEDE3; --paper2:#F6F4EC; --card:#FBFAF4;
+    --paper:#E5E0D1; --paper2:#F1EFE6; --card:#FFFFFF;
     --ink:#16242E; --ink-soft:#4A5B66;
-    --line:rgba(22,36,46,.16); --line-strong:rgba(22,36,46,.30);
+    --line:rgba(22,36,46,.24); --line-strong:rgba(22,36,46,.36);
     --deep:#0E5A7D; --deep-2:#093A52; --shallow:#2E8FB0;
     --hot:#E8731C; --red:#C42E2E; --green:#3C7A4E; --gold:#B8860B;
     --contour-opacity:.07;
-    --shadow:0 2px 0 var(--line), 0 10px 24px -16px rgba(9,58,82,.5);
+    --shadow:0 1px 0 rgba(22,36,46,.13), 0 12px 26px -15px rgba(9,58,82,.55);
     --r:16px;
     --tap:54px;
     --fz:clamp(16px,2.7vw,18px);
@@ -155,6 +155,23 @@
   .plan li{display:flex;gap:11px;align-items:flex-start}
   .plan .pk{flex:0 0 64px;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:12px;color:#fff;background:var(--deep);border-radius:7px;padding:4px 6px;text-align:center;margin-top:1px}
   .plan li > span:last-child{font-size:15px;line-height:1.5}
+
+  /* access links */
+  .access{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .access a{display:block;border:1.5px solid var(--line-strong);border-radius:12px;background:var(--paper2);padding:11px 13px;color:var(--ink);text-decoration:none}
+  .access .pn{font-weight:700;color:var(--deep-2);display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .access .pd{display:block;font-size:13px;color:var(--ink-soft);margin-top:3px;line-height:1.4}
+  .access .arr{color:var(--deep)}
+
+  /* multi-day outlook */
+  .outlook{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .orow{border-left:4px solid var(--line-strong);background:var(--paper2);border-radius:10px;padding:9px 11px}
+  .orow.far{opacity:.7}
+  .otop{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .oday{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;font-weight:600;font-size:15px;color:var(--deep-2);min-width:62px}
+  .opill{color:#fff;font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;border-radius:6px;padding:2px 8px}
+  .omut{font-size:13px;color:var(--ink-soft)}
+  .orz{font-size:13px;color:var(--ink-soft);margin-top:4px;line-height:1.4}
 
   /* metric grid */
   .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -473,6 +490,11 @@
         <div class="hours" id="hours" role="img" aria-label="Hourly bite forecast for the next several hours"></div>
       </div>
 
+      <div class="card" id="outlookCard">
+        <h2>Next few days</h2>
+        <div id="outlookBody"><p class="muted tiny" style="margin:0">Building the outlook…</p></div>
+      </div>
+
       <div class="card" id="solCard" hidden>
         <p class="eyebrow">Feeding times — today</p>
         <div class="sol-head">
@@ -571,6 +593,11 @@
             <button class="btn" id="spSave" type="button">Save spot</button>
           </div>
         </div>
+      </div>
+
+      <div class="card" style="margin-top:14px" id="accessCard">
+        <h2>Get on the water nearby</h2>
+        <div id="accessBody"></div>
       </div>
 
       <div class="card" style="margin-top:14px">
@@ -794,6 +821,7 @@ var $$ = function(s,r){ return Array.prototype.slice.call((r||document).querySel
 
   buildQuickWaters();
   renderPlace();
+  renderAccess();
   renderSpotList();
   renderLog();
   renderPicks();
@@ -888,6 +916,7 @@ function buildQuickWaters(){
 function setLoc(lat,lon,name){
   state.loc={lat:lat,lon:lon,name:name};
   renderPlace();
+  renderAccess();
   var ws=$("#waterSel"); if(ws){ ws.value=inferWaterType(name); }
   renderPicks();
   fetchWeather();
@@ -962,7 +991,7 @@ async function fetchWeather(){
     hourly: "surface_pressure,weather_code,precipitation,wind_speed_10m,cloud_cover",
     daily: "sunrise,sunset",
     temperature_unit:"fahrenheit", wind_speed_unit:"mph", precipitation_unit:"inch",
-    timezone:"auto", past_days:1, forecast_days:2
+    timezone:"auto", past_days:1, forecast_days:7
   });
   try{
     var r = await fetch("https://api.open-meteo.com/v1/forecast?"+p.toString());
@@ -973,6 +1002,7 @@ async function fetchWeather(){
   }catch(e){
     state.weather=null;
     renderSolunar();
+    state.outlook=[]; renderOutlook();
     $("#scoreNum").textContent="—"; $("#verdict").textContent="No data";
     $("#metrics").innerHTML="";
     $("#factors").innerHTML="";
@@ -1034,7 +1064,7 @@ function renderNow(d){
   var M=[
     ["Air temp", Math.round(c.temperature_2m), "°F"],
     ["Feels", Math.round(c.apparent_temperature), "°F"],
-    ["Pressure", c.surface_pressure.toFixed(0)+" "+trendArrow, "hPa "+trend],
+    ["Pressure", (c.surface_pressure*0.02953).toFixed(2)+" "+trendArrow, "inHg "+trend],
     ["Wind", Math.round(c.wind_speed_10m), "mph "+compass(c.wind_direction_10m)],
     ["Gusts", Math.round(c.wind_gusts_10m), "mph"],
     ["Cloud", Math.round(c.cloud_cover), "%"],
@@ -1059,6 +1089,8 @@ function renderNow(d){
     slot.innerHTML='<div class="alert calm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h9a2.5 2.5 0 1 1-2.5 2.5"/></svg><div><strong>Strong gusts.</strong> Gusting to '+Math.round(c.wind_gusts_10m)+' mph — small craft and casting will be rough. Fish protected, downwind shorelines.</div></div>';
   }
   renderHours(d, idx);
+  state.outlook=computeOutlook(d);
+  renderOutlook();
   renderPicks();
   renderPlan();
 }
@@ -1396,7 +1428,7 @@ function renderLog(){
     var dt=new Date(c.when);
     var size = c.len?(c.len+'"'):''; if(c.wt) size += (size?' · ':'')+c.wt+' lb';
     var det=[c.bait,c.water].filter(Boolean).join(' · ');
-    var cond = c.cond? ('Pressure '+c.cond.p+' hPa · Wind '+c.cond.w+' mph '+c.cond.wd+' · '+c.cond.t+'°F') : '';
+    var cond = c.cond? ('Pressure '+(c.cond.p*0.02953).toFixed(2)+' inHg · Wind '+c.cond.w+' mph '+c.cond.wd+' · '+c.cond.t+'°F') : '';
     var div=document.createElement('div'); div.className="logitem";
     div.innerHTML=
       '<div class="h"><span class="sp">'+escapeHTML(c.species)+'</span><span class="size">'+size+'</span></div>'+
@@ -1842,10 +1874,134 @@ function renderPlan(){
   rows.push(["Spots","On water like this, scout "+planSpotFeatures(wkey)+"."]);
   var W=START[wkey]||START.lake, picks=W[skey]||W.summer;
   if(picks&&picks[0]) rows.push(["Start on","<strong>"+escapeHTML(picks[0][0])+"</strong> — "+picks[0][1]]);
+  var bb=outlookBest();
+  if(bb && !bb.best.isToday && bb.best.score>=bb.today.score+12 && bb.today.score<55) rows.push(["Heads up","<strong>"+dayLabel(bb.best.date,bb.best.isToday)+"</strong> looks notably better ("+bb.best.verdict[0].toLowerCase()+") — "+bb.best.reason+". Worth waiting if you can."]);
   var html='<ul class="plan">';
   rows.forEach(function(r){ html+='<li><span class="pk">'+r[0]+'</span><span>'+r[1]+'</span></li>'; });
   html+='</ul><p class="note" style="margin-top:12px">A starting read from today\u2019s conditions and the season — not a rule. Adjust as you learn the water; the cards below have the detail.</p>';
   el.innerHTML=html;
+}
+
+/* ---------------- multi-day outlook (reuses the bite engine per day) ---------------- */
+function outlookReason(o){
+  if(o.storm) return "storms in the mix — fish the gaps";
+  if(o.trend==="falling") return "falling pressure — a strong sign";
+  if(o.moon==="full") return "near a full moon — strong feeding";
+  if(o.moon==="new") return "near a new moon — strong feeding";
+  if(o.windHigh) return "breezy — find a sheltered, windward bank";
+  if(o.trend==="rising") return "rising pressure — likely a slower day";
+  if(o.overcast) return "overcast — fish stay active longer";
+  return "steady, run-of-the-mill conditions";
+}
+function dayBite(o){
+  var s=50;
+  if(o.trend==="falling") s+=20; else if(o.trend==="rising") s-=14; else s+=2;
+  if(o.moon==="full"||o.moon==="new") s+=12; else if(o.moon==="quarter") s-=6; else s+=3;
+  if(o.wind>=4 && o.wind<=14) s+=12; else if(o.wind<2) s-=6; else if(o.wind>22) s-=12;
+  if(o.overcast) s+=8; else if(o.bright) s-=8;
+  if(o.rain) s+=6;
+  if(o.storm) s-=12;
+  s=Math.max(2,Math.min(98,Math.round(s)));
+  var v=s>=78?["Prime","var(--hot)"]:s>=55?["Good","var(--shallow)"]:s>=30?["Fair","var(--gold)"]:["Slow","#6b7b85"];
+  return {score:s, verdict:v};
+}
+function computeOutlook(d){
+  if(!d||!d.hourly||!d.hourly.time||!d.daily||!d.daily.time) return [];
+  var h=d.hourly;
+  if(!h.surface_pressure||!h.wind_speed_10m||!h.cloud_cover||!h.weather_code) return [];
+  var lat=state.loc.lat, lon=state.loc.lon, STORM=[95,96,99], LR=[51,53,55,61,63,80,81], press=h.surface_pressure;
+  var DAYMAP={}, SUN=[];
+  d.daily.time.forEach(function(ds,k){
+    var r=new Date(d.daily.sunrise[k]), s=new Date(d.daily.sunset[k]);
+    DAYMAP[ds]={r:r,s:s}; SUN.push(r.getTime()); SUN.push(s.getTime());
+  });
+  var byDay={}, order=[];
+  for(var i=0;i<h.time.length;i++){ var dk=h.time[i].slice(0,10); if(!byDay[dk]){ byDay[dk]=[]; order.push(dk); } byDay[dk].push(i); }
+  var todayKey=(d.current&&d.current.time)?d.current.time.slice(0,10):(new Date()).toISOString().slice(0,10);
+  var out=[];
+  order.forEach(function(dk){
+    if(dk<todayKey) return;
+    var idxs=byDay[dk], dayDate=new Date(dk+"T12:00:00"), daySol=computeSolunar(dayDate, lat, lon), pair=DAYMAP[dk];
+    var moon=null;
+    if(typeof SunCalc!=="undefined"){ var fr=SunCalc.getMoonIllumination(dayDate).fraction;
+      if(fr>=0.90) moon="full"; else if(fr<=0.10) moon="new"; else if(fr>0.40&&fr<0.60) moon="quarter"; }
+    var hrs=[], storm=false, rain=false, dayWind=0, dayCloud=0, dayN=0, firstP=null, lastP=null;
+    idxs.forEach(function(i){
+      var t=new Date(h.time[i]);
+      var p3=(i>=3 && press[i-3]!=null)?(press[i]-press[i-3]):0;
+      var trend=p3<=-1.5?"falling":p3>=1.5?"rising":"steady";
+      var ll=1e9; for(var j=0;j<SUN.length;j++){ ll=Math.min(ll,Math.abs(SUN[j]-t.getTime())/60000); }
+      var isDay=pair?(t>=pair.r && t<=pair.s):(t.getHours()>=7 && t.getHours()<=19);
+      var cloud=h.cloud_cover[i], wind=h.wind_speed_10m[i], wc=h.weather_code[i];
+      if(STORM.indexOf(wc)>=0) storm=true; if(LR.indexOf(wc)>=0) rain=true;
+      if(firstP==null) firstP=press[i]; lastP=press[i];
+      if(isDay){ dayWind+=wind; dayCloud+=cloud; dayN++; }
+      var b=computeBite({trend:trend, lowLight:ll<=75, overcastDay:isDay&&cloud>=65&&ll>75, brightDay:isDay&&cloud<25&&ll>75, wind:wind, lightRain:LR.indexOf(wc)>=0, stormSoon:STORM.indexOf(wc)>=0, solunar:solunarAt(t, daySol)});
+      hrs.push({t:t, score:b.score});
+    });
+    if(!hrs.length) return;
+    var peak=hrs[0], pi=0; hrs.forEach(function(x,z){ if(x.score>peak.score){ peak=x; pi=z; } });
+    var thr=Math.max(30, peak.score-12), a2=pi, b2=pi;
+    while(a2>0 && hrs[a2-1].score>=thr) a2--;
+    while(b2<hrs.length-1 && hrs[b2+1].score>=thr) b2++;
+    var win=(a2===b2)?("around "+fmtHour(hrs[a2].t)):(fmtHour(hrs[a2].t)+"\u2013"+fmtHour(new Date(hrs[b2].t.getTime()+3600000)));
+    var aw=dayN?dayWind/dayN:0, ac=dayN?dayCloud/dayN:50;
+    var net=(firstP!=null&&lastP!=null)?(lastP-firstP):0;
+    var dtrend=net<=-2?"falling":net>=2?"rising":"steady";
+    var day=dayBite({trend:dtrend, moon:moon, wind:aw, overcast:ac>=65, bright:ac<25, rain:rain, storm:storm});
+    out.push({ dkey:dk, date:dayDate, isToday:(dk===todayKey), score:day.score, verdict:day.verdict, win:win,
+      reason: outlookReason({storm:storm, trend:dtrend, moon:moon, windHigh:aw>18, overcast:ac>=65}) });
+  });
+  return out;
+}
+function dayLabel(date, isToday){
+  if(isToday) return "Today";
+  var tm=new Date(); tm.setDate(tm.getDate()+1);
+  if(date.getFullYear()===tm.getFullYear()&&date.getMonth()===tm.getMonth()&&date.getDate()===tm.getDate()) return "Tomorrow";
+  return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()]+" "+date.getDate();
+}
+function outlookBest(){
+  var o=state.outlook; if(!o||!o.length) return null;
+  var today=o[0], best=o[0]; o.forEach(function(x){ if(x.score>best.score) best=x; });
+  return {today:today, best:best};
+}
+function renderOutlook(){
+  var el=$("#outlookBody"); if(!el) return;
+  var o=state.outlook;
+  if(!o||!o.length){ el.innerHTML='<p class="muted tiny" style="margin:0">The multi-day outlook needs a live connection.</p>'; return; }
+  var bb=outlookBest(), today=bb.today, best=bb.best, head;
+  if(best.isToday || best.score<=today.score+6){
+    head="<strong>Today is about as good as it gets</strong> over the next several days ("+today.verdict[0].toLowerCase()+") — no need to wait for better.";
+  } else {
+    head="<strong>"+dayLabel(best.date,best.isToday)+" looks like the pick</strong> — "+best.verdict[0].toLowerCase()+", "+best.reason+"."+(today.score<55?" Today's only "+today.verdict[0].toLowerCase()+", so it may pay to wait.":"");
+  }
+  var rows="";
+  o.forEach(function(x,i){
+    var c=x.verdict[1];
+    rows+='<li class="orow'+(i>=4?" far":"")+'" style="border-left-color:'+c+'">'
+      +'<div class="otop"><span class="oday">'+dayLabel(x.date,x.isToday)+'</span>'
+      +'<span class="opill" style="background:'+c+'">'+x.verdict[0]+' \u00b7 '+x.score+'</span>'
+      +'<span class="omut">best '+x.win+'</span></div>'
+      +'<div class="orz">'+x.reason+'</div></li>';
+  });
+  el.innerHTML='<p class="note" style="margin:0 0 12px">'+head+'</p><ul class="outlook">'+rows+'</ul>'
+    +'<p class="muted tiny" style="margin:10px 0 0">The moon windows are exact this far out; the weather behind these ratings gets rougher the further ahead you look — treat the last days as a loose guide.</p>';
+}
+
+/* ---------------- access links (reliable map-search, no flaky API) ---------------- */
+function renderAccess(){
+  var e=$("#accessBody"); if(!e||!state.loc) return;
+  var at="/@"+state.loc.lat.toFixed(4)+","+state.loc.lon.toFixed(4)+",12z";
+  function row(label,q,sub){
+    return '<li><a href="https://www.google.com/maps/search/'+q+at+'" target="_blank" rel="noopener">'
+      +'<span class="pn">'+label+' <span class="arr">↗</span></span>'
+      +'<span class="pd">'+sub+'</span></a></li>';
+  }
+  e.innerHTML='<ul class="access">'
+    +row("Boat ramps &amp; launches","boat+ramp","Public launches and slipways near this water")
+    +row("Fishing access &amp; piers","fishing+access","Shore access, piers, and access points")
+    +row("Bait &amp; tackle","bait+and+tackle","Local bait, gear, licenses, and on-the-water intel")
+    +'</ul><p class="note">Opens a map of what\u2019s near your set location — handy for scoping a new spot. Check posted signs and access rules before you launch.</p>';
 }
 
 /* ---------------- util ---------------- */
