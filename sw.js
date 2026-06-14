@@ -1,6 +1,6 @@
 /* Soundline service worker — makes the app open offline.
    If you change files later, bump CACHE (v1 -> v2) to force an update. */
-const CACHE = 'soundline-v4';
+const CACHE = 'soundline-v5';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest',
   '/icon-192.png', '/icon-512.png', '/maskable-512.png', '/apple-touch-icon.png'

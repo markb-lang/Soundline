@@ -180,6 +180,19 @@
     text-transform:uppercase;letter-spacing:.05em;font-size:14px;color:var(--ink-soft)}
   .seg button[aria-pressed="true"]{background:var(--deep);color:#fff}
   .map-hint{font-size:13.5px;margin:10px 2px 0}
+  .map-wrap{position:relative}
+  .map-x{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:450;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+  .sheet{position:fixed;inset:0;z-index:2000;display:flex;align-items:flex-end;justify-content:center;background:rgba(9,58,82,.45)}
+  @media(min-width:560px){.sheet{align-items:center}}
+  .sheet-card{background:var(--card);width:100%;max-width:460px;border:1.5px solid var(--line-strong);border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(9,58,82,.4)}
+  @media(min-width:560px){.sheet-card{border-radius:18px}}
+  .sheet-card h3{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;margin:0 0 14px;font-size:20px}
+  .sp-types{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+  .sp-type{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--line-strong);background:var(--paper2);border-radius:11px;padding:9px 12px;min-height:46px;font-family:inherit;font-size:14px;color:var(--ink)}
+  .sp-type .d{width:13px;height:13px;border-radius:50%;flex:0 0 auto}
+  .sp-type[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink);background:var(--card)}
+  .sheet-actions{display:flex;gap:10px}
+  .sheet-actions .btn{flex:1}
   .leaflet-container{font-family:inherit}
   .spotpin{font-size:13px;line-height:1.4}
   .spotpin b{font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:15px}
@@ -509,13 +522,38 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
           My location
         </button>
-        <button class="btn" id="mapHereBtn">
+        <button class="btn" id="mapDropBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          Drop pin
+        </button>
+        <button class="btn ghost" id="mapHereBtn">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 16a4 4 0 0 1 1-7.9A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>
           Conditions here
         </button>
       </div>
-      <div id="map" aria-label="Topographic map of fishing area"></div>
-      <p class="map-hint muted">Center the map on any pond, backwater, or park lake — even an unnamed one — and tap <strong>Conditions here</strong> for its bite forecast. Tap the map to drop and label a marker (drop-off, weed bed, point, inlet, structure, ramp). USGS topo lines show depth contours and shoreline structure. Markers save on this device.</p>
+      <div class="map-wrap">
+        <div id="map" aria-label="Topographic map of fishing area"></div>
+        <div class="map-x" id="mapX" hidden aria-hidden="true">
+          <svg width="42" height="42" viewBox="0 0 42 42">
+            <g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"><line x1="21" y1="3" x2="21" y2="13"/><line x1="21" y1="29" x2="21" y2="39"/><line x1="3" y1="21" x2="13" y2="21"/><line x1="29" y1="21" x2="39" y2="21"/><circle cx="21" cy="21" r="6.5"/></g>
+            <g fill="none" stroke="#E8731C" stroke-width="2" stroke-linecap="round"><line x1="21" y1="3" x2="21" y2="13"/><line x1="21" y1="29" x2="21" y2="39"/><line x1="3" y1="21" x2="13" y2="21"/><line x1="29" y1="21" x2="39" y2="21"/><circle cx="21" cy="21" r="6.5"/></g>
+          </svg>
+        </div>
+      </div>
+      <p class="map-hint muted">Pan the map so your spot sits under the <strong>crosshair</strong>, then tap <strong>Drop pin</strong> to save and label it — drop-off, weed bed, point, inlet, structure, or ramp. Tap <strong>Conditions here</strong> for the bite forecast at the center, or just tap anywhere on the map to drop a pin there. USGS topo lines show depth contours and structure. Pins save on this device.</p>
+
+      <div class="sheet" id="spotSheet" hidden>
+        <div class="sheet-card">
+          <h3>Save this spot</h3>
+          <label class="field" style="margin-bottom:12px"><span class="lab">Name</span><input type="text" id="spName" placeholder="e.g. North drop-off"></label>
+          <div class="lab" style="margin-bottom:6px">Type</div>
+          <div class="sp-types" id="spTypes"></div>
+          <div class="sheet-actions">
+            <button class="btn ghost" id="spCancel" type="button">Cancel</button>
+            <button class="btn" id="spSave" type="button">Save spot</button>
+          </div>
+        </div>
+      </div>
 
       <div class="card" style="margin-top:14px">
         <h2>My spots</h2>
@@ -766,6 +804,14 @@ function bindControls(){
     if(!state.map){ ensureMap(); }
     if(state.map){ var ctr=state.map.getCenter(); setLoc(ctr.lat, ctr.lng, "Map point"); showTab('now'); }
   });
+  $("#mapDropBtn").addEventListener('click', function(){
+    if(!state.map){ ensureMap(); }
+    if(state.map){ var c=state.map.getCenter(); openSpotSheet(c.lat, c.lng); }
+  });
+  $("#spSave").addEventListener('click', saveSpot);
+  $("#spCancel").addEventListener('click', closeSpotSheet);
+  $("#spotSheet").addEventListener('click', function(e){ if(e.target.id==='spotSheet') closeSpotSheet(); });
+  $("#spName").addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); saveSpot(); } });
   $("#searchInput").addEventListener('keydown', function(e){ if(e.key==='Escape') hideResults(); });
   document.addEventListener('click', function(e){ if(!e.target.closest('#locbar')) hideResults(); });
 
@@ -1182,8 +1228,9 @@ function ensureMap(){
   state.map = L.map('map',{zoomControl:true}).setView([state.loc.lat,state.loc.lon],11);
   setLayer(state.layerKey,true);
   state.spotLayer = L.layerGroup().addTo(state.map);
-  state.map.on('click', function(e){ promptSpot(e.latlng.lat, e.latlng.lng); });
+  state.map.on('click', function(e){ openSpotSheet(e.latlng.lat, e.latlng.lng); });
   state.mapReady=true;
+  var x=$("#mapX"); if(x) x.hidden=false;
   drawSpots();
   setTimeout(function(){ state.map.invalidateSize(); },200);
 }
@@ -1196,15 +1243,33 @@ function setLayer(key, silent){
   state.layer = L.tileLayer(L1.url,{attribution:L1.attr, maxZoom:L1.max}).addTo(state.map);
 }
 var SPOT_TYPES=[["Drop-off","#0E5A7D"],["Weed bed","#3C7A4E"],["Point","#B8860B"],["Inlet / creek","#2E8FB0"],["Structure","#E8731C"],["Ramp","#C42E2E"]];
-function promptSpot(lat,lon){
-  var label = window.prompt("Name this spot (e.g. North drop-off):","");
-  if(label===null) return;
-  label = label.trim() || "Spot";
-  var typeIdx = window.prompt("Type — enter a number:\n1 Drop-off  2 Weed bed  3 Point\n4 Inlet/creek  5 Structure  6 Ramp","1");
-  var ti = parseInt(typeIdx,10); if(isNaN(ti)||ti<1||ti>6) ti=5; ti=ti-1;
-  var sp={id:Date.now(), lat:lat, lon:lon, label:label, type:SPOT_TYPES[ti][0], color:SPOT_TYPES[ti][1]};
+var pendingSpot=null, spType=4;
+function openSpotSheet(lat,lon){
+  pendingSpot={lat:lat,lon:lon}; spType=4;
+  $("#spName").value=""; buildSpotTypes();
+  $("#spotSheet").hidden=false;
+  setTimeout(function(){ var n=$("#spName"); if(n) n.focus(); },60);
+}
+function closeSpotSheet(){ $("#spotSheet").hidden=true; pendingSpot=null; }
+function buildSpotTypes(){
+  var w=$("#spTypes"); w.innerHTML="";
+  SPOT_TYPES.forEach(function(t,i){
+    var b=document.createElement('button'); b.type="button"; b.className="sp-type";
+    b.setAttribute('aria-pressed', String(i===spType));
+    b.innerHTML='<span class="d" style="background:'+t[1]+'"></span>'+t[0];
+    b.addEventListener('click', function(){ spType=i; buildSpotTypes(); });
+    w.appendChild(b);
+  });
+}
+function saveSpot(){
+  if(!pendingSpot) return;
+  var label=($("#spName").value||"").trim()||"Spot";
+  var t=SPOT_TYPES[spType]||SPOT_TYPES[4];
+  var sp={id:Date.now(), lat:pendingSpot.lat, lon:pendingSpot.lon, label:label, type:t[0], color:t[1]};
   state.spots.push(sp); sset("spots",state.spots);
   drawSpots(); renderSpotList(); buildQuickWaters();
+  closeSpotSheet();
+  if(state.map){ state.map.panTo([sp.lat,sp.lon]); }
 }
 function drawSpots(){
   if(!state.spotLayer) return;
