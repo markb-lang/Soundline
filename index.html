@@ -150,6 +150,12 @@
     font-family:"IBM Plex Mono",monospace;font-size:15px;color:#fff;margin-top:1px}
   .tag.up{background:var(--green)} .tag.down{background:var(--red)} .tag.flat{background:var(--ink-soft)}
 
+  /* game plan */
+  .plan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
+  .plan li{display:flex;gap:11px;align-items:flex-start}
+  .plan .pk{flex:0 0 64px;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:12px;color:#fff;background:var(--deep);border-radius:7px;padding:4px 6px;text-align:center;margin-top:1px}
+  .plan li > span:last-child{font-size:15px;line-height:1.5}
+
   /* metric grid */
   .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   @media(min-width:520px){.metrics{grid-template-columns:repeat(4,1fr)}}
@@ -454,6 +460,11 @@
         </div>
         <ul class="factors" id="factors"></ul>
         <p class="note">A read on conditions, not a promise. Pressure trends, low light, wind, and sky are weighed — fish, season, and water still have the final say. <button class="linkbtn" id="manualToggle">No signal? Enter conditions →</button></p>
+      </div>
+
+      <div class="card" id="planCard">
+        <p class="eyebrow">Your game plan</p>
+        <div id="planBody"><p class="muted tiny" style="margin:0">Building your plan from the forecast…</p></div>
       </div>
 
       <div class="card" id="hoursCard">
@@ -843,8 +854,8 @@ function bindControls(){
   $("#krInland").addEventListener('click', function(){ setKrWater('inland'); });
   $("#krErie").addEventListener('click', function(){ setKrWater('erie'); });
   if($("#stateSel")) $("#stateSel").addEventListener('change', function(){ renderRegsState($("#stateSel").value); });
-  $("#seasonSel").addEventListener('change', renderPicks);
-  $("#waterSel").addEventListener('change', renderPicks);
+  $("#seasonSel").addEventListener("change", function(){ renderPicks(); renderPlan(); });
+  $("#waterSel").addEventListener("change", function(){ renderPicks(); renderPlan(); });
 }
 function applySun(){
   document.documentElement.setAttribute('data-sun', state.sun?'on':'off');
@@ -1049,6 +1060,7 @@ function renderNow(d){
   }
   renderHours(d, idx);
   renderPicks();
+  renderPlan();
 }
 function fmtTime(d){ var h=d.getHours(), m=d.getMinutes(); var ap=h>=12?"p":"a"; h=h%12||12; return h+":"+(m<10?"0":"")+m+ap; }
 
@@ -1088,6 +1100,13 @@ function renderHours(d, idx){
   } else {
     sum.innerHTML='Slow stretch ahead. <b>Early and late</b> are still your best odds — fish low light and any wind you can find.';
   }
+  var pos=0; for(var z=0;z<arr.length;z++){ if(arr[z].i===best.i){ pos=z; break; } }
+  var thr=Math.max(30, best.score-12), a2=pos, b2=pos;
+  while(a2>0 && arr[a2-1].score>=thr) a2--;
+  while(b2<arr.length-1 && arr[b2+1].score>=thr) b2++;
+  var endLbl=fmtHour(new Date(arr[b2].t.getTime()+3600000));
+  state.window={ isNow:(best.i===idx), peakScore:best.score, peakWord:best.v[0],
+    range:(a2===b2)?("around "+fmtHour(arr[a2].t)):(fmtHour(arr[a2].t)+"\u2013"+endLbl) };
 }
 function fmtHour(d){ var h=d.getHours(), ap=h>=12?"p":"a"; h=h%12||12; return h+ap; }
 
@@ -1465,6 +1484,8 @@ function runManual(){
     '<div class="metric"><div class="k">Pressure</div><div class="v" style="font-size:17px">'+trendTxt+'</div></div>'+
     '<div class="metric"><div class="k">Sky</div><div class="v" style="font-size:17px">'+skyTxt+'</div></div>'+
     '<div class="metric"><div class="k">Source</div><div class="v" style="font-size:17px">Manual</div></div>';
+  state.manualWx={ wind_speed_10m:w, wind_direction_10m:deg, cloud_cover:(sky==="overcast"?80:sky==="bright"?10:50), is_day:(sky==="night"?0:1) };
+  renderPlan();
 }
 
 /* ---------------- keep / release ---------------- */
@@ -1691,12 +1712,14 @@ async function fetchWater(){
     if(!best){
       state.water=null;
       renderWaterMsg("No USGS gauge within about 45 miles. USGS monitors rivers, streams, and many reservoirs — not every pond or small lake. For big lakes and the coast, a NOAA buoy is the better source.", false);
+      renderPlan();
       return;
     }
     state.water={ name:best.name, site:best.site, dist:best._d,
       tempF: best.tempC!=null?cToF(best.tempC):null, flow: best.flow!=null?best.flow:null,
       gage: best.gage!=null?best.gage:null, when: best.dt?fmtClockFromISO(best.dt):"" };
     renderWaterData(state.water);
+    renderPlan();
   }catch(err){
     renderWaterMsg("Couldn't reach the USGS gauges just now — this can happen on a weak signal. Tap to try again.", true);
   }
@@ -1783,6 +1806,46 @@ function renderPicks(){
     else if(c.cloud_cover<25) msg+=" Bright sun right now — fish shade, cover, and deeper water through midday.";
   }
   $("#startCtx").textContent=msg;
+}
+
+/* ---------------- game plan (synthesizes the other signals) ---------------- */
+function planSpotFeatures(wkey){
+  if(wkey==="river") return "current seams and the slack water behind rocks, the deep holes, and the tailouts just below riffles and dams";
+  if(wkey==="greatlake") return "tributary and river mouths, rocky points and reefs, breakwalls, and harbor mouths";
+  return "any creek or inlet mouth, the first drop-off out from the ramp, points with the wind blowing into them, and shoreline cover like docks, laydowns, and weed edges";
+}
+function planTempLine(tempF){
+  if(tempF==null) return null;
+  var f=Math.round(tempF);
+  if(f<45) return "Water's cold ("+f+"°F) — fish are deep and slow. Downsize, slow way down, and fish the warmest hours.";
+  if(f<55) return "Water's cool ("+f+"°F) — start in sun-warmed shallows and pockets; fish are moving up but still lethargic.";
+  if(f<68) return "Water's in a prime range ("+f+"°F) — fish are shallow and active. Cover water and expect a willing bite.";
+  if(f<78) return "Water's warm ("+f+"°F) — strong activity, but fish low light; midday, lean on shade, current, and deeper edges.";
+  if(f<86) return "Water's warm-to-hot ("+f+"°F) — fish shallow at dawn and dusk, then move deeper, to current, or to shade.";
+  return "Water's hot ("+f+"°F) — best at dawn, dusk, or after dark; otherwise find the coolest, most oxygenated water around.";
+}
+function renderPlan(){
+  var el=$("#planBody"); if(!el) return;
+  var wx=(state.weather&&state.weather.current)||state.manualWx;
+  if(!wx){ el.innerHTML='<p class="muted tiny" style="margin:0">Building your plan from the forecast…</p>'; return; }
+  var wkey=($("#waterSel")&&$("#waterSel").value)||inferWaterType(state.loc.name);
+  var skey=($("#seasonSel")&&$("#seasonSel").value)||currentSeason();
+  var rows=[], win=state.window;
+  if(win && win.isNow) rows.push(["When","The bite window is open <strong>right now</strong> ("+win.peakWord.toLowerCase()+") — don't wait around."]);
+  else if(win && win.peakScore>=30) rows.push(["When","Aim for <strong>"+win.range+"</strong> — the strongest bite window ahead ("+win.peakWord.toLowerCase()+")."]);
+  else rows.push(["When","No standout window today — fish <strong>early and late</strong>, and any wind you can find."]);
+  var w=wx.wind_speed_10m, dir=wx.wind_direction_10m;
+  if(w>=2) rows.push(["Where","Wind's from the <strong>"+compass(dir)+"</strong>, so start on the <strong>"+compass(opp(dir))+" shore</strong> and cast into the chop — bait and feeding fish stack on the windward bank."]);
+  else rows.push(["Where","Near calm — work shade, points, and deeper edges, and downsize your presentation."]);
+  var tl=planTempLine(state.water&&state.water.tempF);
+  if(tl) rows.push(["Water", tl]);
+  rows.push(["Spots","On water like this, scout "+planSpotFeatures(wkey)+"."]);
+  var W=START[wkey]||START.lake, picks=W[skey]||W.summer;
+  if(picks&&picks[0]) rows.push(["Start on","<strong>"+escapeHTML(picks[0][0])+"</strong> — "+picks[0][1]]);
+  var html='<ul class="plan">';
+  rows.forEach(function(r){ html+='<li><span class="pk">'+r[0]+'</span><span>'+r[1]+'</span></li>'; });
+  html+='</ul><p class="note" style="margin-top:12px">A starting read from today\u2019s conditions and the season — not a rule. Adjust as you learn the water; the cards below have the detail.</p>';
+  el.innerHTML=html;
 }
 
 /* ---------------- util ---------------- */
