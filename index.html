@@ -1627,12 +1627,14 @@ function waterTempHint(f){
   if(f<86) return "Warm-to-hot — work early and late, and look to deeper water, current, or shade.";
   return "Hot — go at dawn, dusk, after dark, or find cooler moving water.";
 }
-function renderWaterEmpty(msg){ var e=$("#waterBody"); if(e) e.innerHTML='<p class="note" style="margin:0">'+msg+'</p>'; }
-function renderWater(){
+function renderWaterLoading(){ var e=$("#waterBody"); if(e) e.innerHTML='<p class="muted tiny" style="margin:0">Reading nearby gauges…</p>'; }
+function renderWaterMsg(msg,retry){
   var e=$("#waterBody"); if(!e) return;
-  var w=state.water;
-  if(w===null){ renderWaterEmpty("No USGS gauge within about 30 miles. USGS monitors rivers, streams, and many reservoirs — not every pond or small lake. For big lakes and the coast, a NOAA buoy is the better source."); return; }
-  if(!w){ e.innerHTML='<p class="muted tiny" style="margin:0">Reading nearby gauges…</p>'; return; }
+  e.innerHTML='<p class="note" style="margin:0">'+msg+'</p>'+(retry?'<button class="btn ghost" id="waterRetry" style="margin-top:10px">Try again</button>':'');
+  if(retry){ var b=$("#waterRetry"); if(b) b.addEventListener('click', function(){ fetchWater(); }); }
+}
+function renderWaterData(w){
+  var e=$("#waterBody"); if(!e) return;
   var tiles="";
   if(w.tempF!=null) tiles+='<div class="metric"><div class="k">Water temp</div><div class="v">'+Math.round(w.tempF)+'°<small>F</small></div></div>';
   if(w.flow!=null)  tiles+='<div class="metric"><div class="k">Flow</div><div class="v" style="font-size:18px">'+fmtNum(w.flow)+' <small>cfs</small></div></div>';
@@ -1644,40 +1646,59 @@ function renderWater(){
   html+='<ul class="linklist" style="margin-top:8px"><li><a href="https://waterdata.usgs.gov/monitoring-location/'+encodeURIComponent(w.site)+'/" target="_blank" rel="noopener">Trend &amp; details on USGS<span class="arr">↗</span></a></li></ul>';
   e.innerHTML=html;
 }
+function usgsParseSites(d){
+  var ts=(d&&d.value&&d.value.timeSeries)||[], sites={};
+  ts.forEach(function(t){
+    var si=t.sourceInfo||{}, code=si.siteCode&&si.siteCode[0]&&si.siteCode[0].value;
+    var g=si.geoLocation&&si.geoLocation.geogLocation; if(!code||!g) return;
+    var pc=t.variable&&t.variable.variableCode&&t.variable.variableCode[0]&&t.variable.variableCode[0].value;
+    var vals=t.values&&t.values[0]&&t.values[0].value, latest=null;
+    if(vals&&vals.length){ for(var i=vals.length-1;i>=0;i--){ var v=parseFloat(vals[i].value); if(!isNaN(v)&&v>-999998){ latest={v:v,dt:vals[i].dateTime}; break; } } }
+    if(latest==null) return;
+    if(!sites[code]) sites[code]={name:si.siteName||("USGS "+code), lat:+g.latitude, lon:+g.longitude, site:code};
+    if(pc==="00010"){ sites[code].tempC=latest.v; sites[code].dt=latest.dt; }
+    else if(pc==="00060"){ sites[code].flow=latest.v; sites[code].dt=sites[code].dt||latest.dt; }
+    else if(pc==="00065"){ sites[code].gage=latest.v; sites[code].dt=sites[code].dt||latest.dt; }
+  });
+  return sites;
+}
+function usgsNearest(sites,lat,lon){
+  var best=null,bestD=1e9;
+  Object.keys(sites).forEach(function(k){
+    var st=sites[k]; if(st.tempC==null && st.flow==null) return;
+    var dd=distMiles(lat,lon,st.lat,st.lon); if(dd<bestD){ bestD=dd; best=st; best._d=dd; }
+  });
+  return best;
+}
+async function usgsQuery(lat,lon,dLat,dLon){
+  var W=(lon-dLon).toFixed(4),E=(lon+dLon).toFixed(4),S=(lat-dLat).toFixed(4),N=(lat+dLat).toFixed(4);
+  var url="https://waterservices.usgs.gov/nwis/iv/?format=json&bBox="+W+","+S+","+E+","+N+"&parameterCd=00010,00060,00065&siteStatus=active";
+  var ctrl=("AbortController" in window)?new AbortController():null;
+  var to=ctrl?setTimeout(function(){ try{ctrl.abort();}catch(e){} },12000):null;
+  var r=await fetch(url, ctrl?{signal:ctrl.signal}:undefined);
+  if(to) clearTimeout(to);
+  if(r.status===404) return {};                 // no gauges in this box — not an error
+  if(!r.ok) throw new Error("status "+r.status);
+  return usgsParseSites(await r.json());
+}
 async function fetchWater(){
   if(!state.loc) return;
   var lat=state.loc.lat, lon=state.loc.lon;
-  state.water=undefined; renderWater();
-  var W=(lon-0.55).toFixed(4), E=(lon+0.55).toFixed(4), S=(lat-0.45).toFixed(4), N=(lat+0.45).toFixed(4);
-  var url="https://waterservices.usgs.gov/nwis/iv/?format=json&bBox="+W+","+S+","+E+","+N+"&parameterCd=00010,00060,00065&siteStatus=active";
+  state.water=undefined; renderWaterLoading();
   try{
-    var r=await fetch(url); if(!r.ok) throw 0;
-    var d=await r.json();
-    var ts=(d&&d.value&&d.value.timeSeries)||[], sites={};
-    ts.forEach(function(t){
-      var si=t.sourceInfo||{}, code=si.siteCode&&si.siteCode[0]&&si.siteCode[0].value;
-      var g=si.geoLocation&&si.geoLocation.geogLocation; if(!code||!g) return;
-      var pc=t.variable&&t.variable.variableCode&&t.variable.variableCode[0]&&t.variable.variableCode[0].value;
-      var vals=t.values&&t.values[0]&&t.values[0].value, latest=null;
-      if(vals&&vals.length){ for(var i=vals.length-1;i>=0;i--){ var v=parseFloat(vals[i].value); if(!isNaN(v)&&v>-999998){ latest={v:v,dt:vals[i].dateTime}; break; } } }
-      if(latest==null) return;
-      if(!sites[code]) sites[code]={name:si.siteName||("USGS "+code), lat:+g.latitude, lon:+g.longitude, site:code};
-      if(pc==="00010"){ sites[code].tempC=latest.v; sites[code].dt=latest.dt; }
-      else if(pc==="00060"){ sites[code].flow=latest.v; sites[code].dt=sites[code].dt||latest.dt; }
-      else if(pc==="00065"){ sites[code].gage=latest.v; sites[code].dt=sites[code].dt||latest.dt; }
-    });
-    var best=null, bestD=1e9;
-    Object.keys(sites).forEach(function(k){
-      var st=sites[k]; if(st.tempC==null && st.flow==null) return;
-      var dd=distMiles(lat,lon,st.lat,st.lon); if(dd<bestD){ bestD=dd; best=st; }
-    });
-    if(!best){ state.water=null; renderWater(); return; }
-    state.water={ name:best.name, site:best.site, dist:bestD,
+    var best=usgsNearest(await usgsQuery(lat,lon,0.30,0.35), lat, lon);          // ~22 mi, small/fast payload
+    if(!best) best=usgsNearest(await usgsQuery(lat,lon,0.60,0.70), lat, lon);     // widen to ~45 mi on a miss
+    if(!best){
+      state.water=null;
+      renderWaterMsg("No USGS gauge within about 45 miles. USGS monitors rivers, streams, and many reservoirs — not every pond or small lake. For big lakes and the coast, a NOAA buoy is the better source.", false);
+      return;
+    }
+    state.water={ name:best.name, site:best.site, dist:best._d,
       tempF: best.tempC!=null?cToF(best.tempC):null, flow: best.flow!=null?best.flow:null,
       gage: best.gage!=null?best.gage:null, when: best.dt?fmtClockFromISO(best.dt):"" };
-    renderWater();
+    renderWaterData(state.water);
   }catch(err){
-    renderWaterEmpty("Couldn't reach the USGS gauges just now — they need a connection. Try again when you're back online.");
+    renderWaterMsg("Couldn't reach the USGS gauges just now — this can happen on a weak signal. Tap to try again.", true);
   }
 }
 
