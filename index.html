@@ -4,6 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#093A52" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/icon-192.png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Soundline" />
+<meta name="description" content="A free, sun-readable Ohio fishing field guide: live bite forecast, topo maps, a catch log, and regulations." />
 <title>Soundline — Ohio waters field companion</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -610,14 +618,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 "use strict";
+/* register service worker (makes the app installable + work offline) */
+if('serviceWorker' in navigator){ window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }); }
 /* ---------------- state + storage ---------------- */
-var mem = {}; // fallback if window.storage unavailable
+var mem = {}; // last-resort fallback
+// Saves to the visitor's own browser (localStorage) on the live site;
+// falls back to the Claude preview's storage, then to memory. No account, nothing leaves the device.
 async function sget(key){
+  try{ var v=localStorage.getItem(key); if(v!==null) return JSON.parse(v); }catch(e){}
   try{ if(window.storage){ var r = await window.storage.get(key,false); return r ? JSON.parse(r.value) : null; } }catch(e){}
   return (key in mem) ? mem[key] : null;
 }
 async function sset(key,val){
   mem[key]=val;
+  try{ localStorage.setItem(key, JSON.stringify(val)); return; }catch(e){}
   try{ if(window.storage){ await window.storage.set(key, JSON.stringify(val), false); } }catch(e){}
 }
 
