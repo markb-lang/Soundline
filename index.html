@@ -651,7 +651,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.4.0/suncalc.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.min.js"></script>
 <script>
 "use strict";
 /* register service worker (makes the app installable + work offline) */
@@ -1012,7 +1012,7 @@ function moonName(ph){
 function computeSolunar(date, lat, lon){
   if(typeof SunCalc==="undefined") return null;
   var ill=SunCalc.getMoonIllumination(date);
-  var mt=SunCalc.getMoonTimes(date, lat, lon);
+  var mt=(typeof SunCalc.getMoonTimes==="function")?SunCalc.getMoonTimes(date, lat, lon):{};
   // scan the local day for moon's highest point (overhead) and lowest (underfoot)
   var start=new Date(date); start.setHours(0,0,0,0);
   var upT=null,loT=null,upA=-99,loA=99;
@@ -1061,9 +1061,10 @@ function drawMoon(svg, phase, frac){
 }
 function renderSolunar(){
   var card=$("#solCard"); if(!card) return;
+  try{
   var sol=computeSolunar(new Date(), state.loc.lat, state.loc.lon);
   state.sol=sol;
-  if(!sol){ card.hidden=true; return; }   // SunCalc not loaded yet (cold offline) — hide gracefully
+  if(!sol){ card.hidden=true; return; }   // SunCalc unavailable (cold offline) — hide gracefully
   card.hidden=false;
   drawMoon($("#solMoon"), sol.phase, sol.illum);
   $("#solPhase").textContent=sol.phaseName;
@@ -1088,6 +1089,7 @@ function renderSolunar(){
   if(active){ nb.innerHTML='Feeding window active now<small>'+active.label+' period · '+active.meta.toLowerCase()+' — until '+fmtTime(active.end)+'.</small>'; }
   else if(next){ nb.innerHTML='Next window '+fmtTime(next.start)+'<small>'+next.label+' period · '+next.meta.toLowerCase()+'.</small>'; }
   else { nb.innerHTML=""; }
+  }catch(e){ state.sol=null; card.hidden=true; }  // feeding times must never break the core forecast
 }
 
 function setGauge(score, color){
