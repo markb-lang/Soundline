@@ -483,6 +483,11 @@
         <div class="metrics" id="metrics"></div>
       </div>
 
+      <div class="card" id="waterCard">
+        <h2>Water conditions</h2>
+        <div id="waterBody"><p class="muted tiny" style="margin:0"><span class="skeleton" style="display:block;width:70%"></span></p></div>
+      </div>
+
       <div class="card">
         <h2>Wind &amp; where to fish</h2>
         <div class="wind-row">
@@ -784,6 +789,7 @@ var $$ = function(s,r){ return Array.prototype.slice.call((r||document).querySel
   bindTabs();
   bindControls();
   fetchWeather();
+  fetchWater();
 })();
 
 /* ---------------- tabs ---------------- */
@@ -874,6 +880,7 @@ function setLoc(lat,lon,name){
   var ws=$("#waterSel"); if(ws){ ws.value=inferWaterType(name); }
   renderPicks();
   fetchWeather();
+  fetchWater();
   if(state.mapReady && state.map){ state.map.setView([lat,lon], Math.max(state.map.getZoom(),11)); }
 }
 function renderPlace(){
@@ -1597,6 +1604,81 @@ function detectStateForLoc(){
       var s=d&&d.address&&d.address.state;
       if(s&&findState(s)){ var sel=$("#stateSel"); if(sel){ sel.value=s; renderRegsState(s); } }
     }).catch(function(){});
+}
+
+/* ---------------- water conditions (USGS) ----------------
+   Real-time water temp / streamflow / gage height from the nearest USGS gauge.
+   Uses the legacy Instantaneous Values API (waterservices.usgs.gov/nwis/iv, JSON, CORS-ok).
+   NOTE: USGS is decommissioning this host in Q1 2027 (no degradation before Aug 2026) —
+   migrate to api.waterdata.usgs.gov once its real-time/continuous endpoint is stable. */
+function distMiles(aLat,aLon,bLat,bLon){
+  var R=3958.8, dLat=(bLat-aLat)*Math.PI/180, dLon=(bLon-aLon)*Math.PI/180;
+  var s=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+}
+function cToF(c){ return c*9/5+32; }
+function fmtNum(n){ return Math.round(n).toLocaleString(); }
+function fmtClockFromISO(iso){ try{ return new Date(iso).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); }catch(e){ return ""; } }
+function waterTempHint(f){
+  if(f<45) return "Cold — fish are sluggish; slow your presentation and fish the midday warmth.";
+  if(f<55) return "Cold-to-cool — the bite is waking up; target sun-warmed shallows.";
+  if(f<68) return "Cool — a prime window for walleye, trout, and pre-spawn bass.";
+  if(f<78) return "Warm — peak warmwater activity; bass, panfish, and catfish are on. Fish low light.";
+  if(f<86) return "Warm-to-hot — work early and late, and look to deeper water, current, or shade.";
+  return "Hot — go at dawn, dusk, after dark, or find cooler moving water.";
+}
+function renderWaterEmpty(msg){ var e=$("#waterBody"); if(e) e.innerHTML='<p class="note" style="margin:0">'+msg+'</p>'; }
+function renderWater(){
+  var e=$("#waterBody"); if(!e) return;
+  var w=state.water;
+  if(w===null){ renderWaterEmpty("No USGS gauge within about 30 miles. USGS monitors rivers, streams, and many reservoirs — not every pond or small lake. For big lakes and the coast, a NOAA buoy is the better source."); return; }
+  if(!w){ e.innerHTML='<p class="muted tiny" style="margin:0">Reading nearby gauges…</p>'; return; }
+  var tiles="";
+  if(w.tempF!=null) tiles+='<div class="metric"><div class="k">Water temp</div><div class="v">'+Math.round(w.tempF)+'°<small>F</small></div></div>';
+  if(w.flow!=null)  tiles+='<div class="metric"><div class="k">Flow</div><div class="v" style="font-size:18px">'+fmtNum(w.flow)+' <small>cfs</small></div></div>';
+  if(w.gage!=null)  tiles+='<div class="metric"><div class="k">Stage</div><div class="v" style="font-size:18px">'+w.gage.toFixed(2)+' <small>ft</small></div></div>';
+  var html='<p class="muted tiny" style="margin:0 0 10px">\uD83D\uDCCD '+escapeHTML(w.name)+' \u00b7 '+w.dist.toFixed(0)+' mi away'+(w.when?' \u00b7 as of '+w.when:'')+'</p>';
+  html+='<div class="metrics">'+tiles+'</div>';
+  if(w.tempF!=null) html+='<p class="note" style="margin-top:10px">'+waterTempHint(w.tempF)+'</p>';
+  if(w.flow!=null)  html+='<p class="note">Flow moves the bite — a bump of rising, stained water after rain often turns fish on near cover, while very high or muddy water is tough going.</p>';
+  html+='<ul class="linklist" style="margin-top:8px"><li><a href="https://waterdata.usgs.gov/monitoring-location/'+encodeURIComponent(w.site)+'/" target="_blank" rel="noopener">Trend &amp; details on USGS<span class="arr">↗</span></a></li></ul>';
+  e.innerHTML=html;
+}
+async function fetchWater(){
+  if(!state.loc) return;
+  var lat=state.loc.lat, lon=state.loc.lon;
+  state.water=undefined; renderWater();
+  var W=(lon-0.55).toFixed(4), E=(lon+0.55).toFixed(4), S=(lat-0.45).toFixed(4), N=(lat+0.45).toFixed(4);
+  var url="https://waterservices.usgs.gov/nwis/iv/?format=json&bBox="+W+","+S+","+E+","+N+"&parameterCd=00010,00060,00065&siteStatus=active";
+  try{
+    var r=await fetch(url); if(!r.ok) throw 0;
+    var d=await r.json();
+    var ts=(d&&d.value&&d.value.timeSeries)||[], sites={};
+    ts.forEach(function(t){
+      var si=t.sourceInfo||{}, code=si.siteCode&&si.siteCode[0]&&si.siteCode[0].value;
+      var g=si.geoLocation&&si.geoLocation.geogLocation; if(!code||!g) return;
+      var pc=t.variable&&t.variable.variableCode&&t.variable.variableCode[0]&&t.variable.variableCode[0].value;
+      var vals=t.values&&t.values[0]&&t.values[0].value, latest=null;
+      if(vals&&vals.length){ for(var i=vals.length-1;i>=0;i--){ var v=parseFloat(vals[i].value); if(!isNaN(v)&&v>-999998){ latest={v:v,dt:vals[i].dateTime}; break; } } }
+      if(latest==null) return;
+      if(!sites[code]) sites[code]={name:si.siteName||("USGS "+code), lat:+g.latitude, lon:+g.longitude, site:code};
+      if(pc==="00010"){ sites[code].tempC=latest.v; sites[code].dt=latest.dt; }
+      else if(pc==="00060"){ sites[code].flow=latest.v; sites[code].dt=sites[code].dt||latest.dt; }
+      else if(pc==="00065"){ sites[code].gage=latest.v; sites[code].dt=sites[code].dt||latest.dt; }
+    });
+    var best=null, bestD=1e9;
+    Object.keys(sites).forEach(function(k){
+      var st=sites[k]; if(st.tempC==null && st.flow==null) return;
+      var dd=distMiles(lat,lon,st.lat,st.lon); if(dd<bestD){ bestD=dd; best=st; }
+    });
+    if(!best){ state.water=null; renderWater(); return; }
+    state.water={ name:best.name, site:best.site, dist:bestD,
+      tempF: best.tempC!=null?cToF(best.tempC):null, flow: best.flow!=null?best.flow:null,
+      gage: best.gage!=null?best.gage:null, when: best.dt?fmtClockFromISO(best.dt):"" };
+    renderWater();
+  }catch(err){
+    renderWaterEmpty("Couldn't reach the USGS gauges just now — they need a connection. Try again when you're back online.");
+  }
 }
 
 /* ---------------- where to start (season) ---------------- */
