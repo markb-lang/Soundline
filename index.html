@@ -183,6 +183,7 @@
   .map-wrap{position:relative}
   .map-x{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:450;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
   .sheet{position:fixed;inset:0;z-index:2000;display:flex;align-items:flex-end;justify-content:center;background:rgba(9,58,82,.45)}
+  .sheet[hidden]{display:none}
   @media(min-width:560px){.sheet{align-items:center}}
   .sheet-card{background:var(--card);width:100%;max-width:460px;border:1.5px solid var(--line-strong);border-radius:18px 18px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(9,58,82,.4)}
   @media(min-width:560px){.sheet-card{border-radius:18px}}
