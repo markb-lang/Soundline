@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#093A52" />
+<title>Soundline — Ohio waters field companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  :root{
+    --paper:#EFEDE3; --paper2:#F6F4EC; --card:#FBFAF4;
+    --ink:#16242E; --ink-soft:#4A5B66;
+    --line:rgba(22,36,46,.16); --line-strong:rgba(22,36,46,.30);
+    --deep:#0E5A7D; --deep-2:#093A52; --shallow:#2E8FB0;
+    --hot:#E8731C; --red:#C42E2E; --green:#3C7A4E; --gold:#B8860B;
+    --contour-opacity:.07;
+    --shadow:0 2px 0 var(--line), 0 10px 24px -16px rgba(9,58,82,.5);
+    --r:16px;
+    --tap:54px;
+    --fz:clamp(16px,2.7vw,18px);
+  }
+  [data-sun="on"]{
+    --paper:#FCFCF8; --paper2:#FFFFFF; --card:#FFFFFF;
+    --ink:#070C0F; --ink-soft:#243038;
+    --line:rgba(7,12,15,.34); --line-strong:rgba(7,12,15,.55);
+    --deep:#0A4D6B; --deep-2:#06314a; --shallow:#1F6F8C;
+    --hot:#C75A0B; --red:#A81E1E; --green:#2C6440; --gold:#8A6608;
+    --contour-opacity:0;
+    --shadow:0 2px 0 var(--line);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Atkinson Hyperlegible","Verdana",system-ui,sans-serif;
+    font-size:var(--fz); line-height:1.5; color:var(--ink);
+    background:var(--paper);
+    -webkit-text-size-adjust:100%;
+    overflow-x:hidden;
+  }
+  /* subtle bathymetric contour texture */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    opacity:var(--contour-opacity);
+    background-image:
+      repeating-radial-gradient(circle at 18% 12%, transparent 0 26px, var(--deep-2) 26px 27px),
+      repeating-radial-gradient(circle at 85% 78%, transparent 0 34px, var(--deep-2) 34px 35px);
+    background-size:520px 520px, 640px 640px;
+    transition:opacity .3s;
+  }
+  .display{font-family:"Saira Condensed","Oswald","Arial Narrow",system-ui,sans-serif;letter-spacing:.02em}
+  .mono{font-family:"IBM Plex Mono","Courier New",monospace;font-variant-numeric:tabular-nums}
+
+  a{color:var(--deep)}
+  button{font:inherit;cursor:pointer;color:inherit}
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+    outline:3px solid var(--hot); outline-offset:2px; border-radius:6px;
+  }
+
+  /* ---------- shell ---------- */
+  .app{position:relative;z-index:1;max-width:760px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+  header.top{
+    position:sticky;top:0;z-index:30;
+    background:linear-gradient(180deg,var(--deep-2),var(--deep));
+    color:#F4F1E6; padding:10px 16px calc(10px + env(safe-area-inset-top,0)) 16px;
+    box-shadow:0 6px 18px -10px rgba(9,58,82,.8);
+    border-bottom:2px solid rgba(255,255,255,.12);
+    overflow:hidden;
+  }
+  header.top::after{ /* faint sounding lines */
+    content:"";position:absolute;inset:0;opacity:.16;pointer-events:none;
+    background:repeating-linear-gradient(90deg,transparent 0 13px,rgba(255,255,255,.5) 13px 14px);
+    -webkit-mask:radial-gradient(120% 140% at 100% 0,#000,transparent 70%);
+            mask:radial-gradient(120% 140% at 100% 0,#000,transparent 70%);
+  }
+  .brandrow{display:flex;align-items:center;gap:12px;position:relative}
+  .mark{flex:0 0 auto;width:38px;height:38px}
+  .brand h1{font-family:"Saira Condensed",system-ui,sans-serif;font-weight:700;
+    font-size:clamp(26px,7vw,34px);line-height:.92;margin:0;letter-spacing:.04em;text-transform:uppercase}
+  .brand p{margin:2px 0 0;font-size:13px;color:#CFE6F0;letter-spacing:.02em}
+  .sun-toggle{
+    margin-left:auto;display:flex;align-items:center;gap:8px;
+    background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.35);
+    color:#fff;padding:8px 12px;border-radius:999px;min-height:44px;font-size:13px;
+    font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;
+  }
+  .sun-toggle[aria-pressed="true"]{background:var(--gold);border-color:#fff;color:#1a1205}
+
+  main{flex:1;padding:14px 14px 96px;position:relative}
+  .panel{display:none;animation:fade .25s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.panel,*{animation:none!important;transition:none!important}}
+
+  .card{background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin:0 0 14px}
+  .card h2{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;
+    font-size:20px;margin:0 0 10px;display:flex;align-items:center;gap:8px;color:var(--deep-2)}
+  .eyebrow{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.14em;
+    font-size:12px;color:var(--ink-soft);margin:0 0 4px}
+  .muted{color:var(--ink-soft)}
+  .tiny{font-size:13px}
+
+  /* ---------- location bar ---------- */
+  .locbar{display:flex;gap:8px;align-items:stretch;margin-bottom:14px;position:relative}
+  .locbar form{display:flex;flex:1;gap:8px}
+  .locbar input[type=search]{flex:1;min-width:0;border:1.5px solid var(--line-strong);border-radius:12px;
+    padding:0 14px;height:var(--tap);background:var(--paper2);color:var(--ink);font-size:16px}
+  .btn{border:1.5px solid var(--deep-2);background:var(--deep);color:#fff;border-radius:12px;min-height:var(--tap);
+    padding:0 16px;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;
+    font-size:16px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .btn.ghost{background:var(--paper2);color:var(--deep-2);border-color:var(--line-strong)}
+  .btn.hot{background:var(--hot);border-color:#a4520f}
+  .btn.block{width:100%}
+  .btn:active{transform:translateY(1px)}
+  .btn[disabled]{opacity:.5;cursor:default}
+
+  .place{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .place .name{font-family:"Saira Condensed",system-ui,sans-serif;font-size:24px;font-weight:700;letter-spacing:.02em}
+  .place .coords{font-size:13px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .chip{border:1.5px solid var(--line-strong);background:var(--paper2);border-radius:999px;padding:7px 12px;
+    min-height:42px;display:inline-flex;align-items:center;gap:6px;font-size:14px}
+  .chip.water{font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:15px}
+
+  /* ---------- bite gauge ---------- */
+  .gauge-wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
+  .gauge{width:min(420px,86vw);height:auto;display:block}
+  .gauge-read{margin-top:-18px}
+  .score{font-family:"Saira Condensed",system-ui,sans-serif;font-weight:700;font-size:clamp(48px,15vw,76px);
+    line-height:.9;letter-spacing:.01em}
+  .verdict{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;
+    font-size:clamp(20px,5.5vw,26px);font-weight:700}
+  .gauge-legend{display:flex;gap:4px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+  .gauge-legend span{font-size:11.5px;letter-spacing:.04em;padding:3px 8px;border-radius:6px;color:#fff;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase}
+
+  .factors{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .factors li{display:flex;gap:10px;align-items:flex-start;font-size:14.5px}
+  .tag{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-weight:700;
+    font-family:"IBM Plex Mono",monospace;font-size:15px;color:#fff;margin-top:1px}
+  .tag.up{background:var(--green)} .tag.down{background:var(--red)} .tag.flat{background:var(--ink-soft)}
+
+  /* metric grid */
+  .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  @media(min-width:520px){.metrics{grid-template-columns:repeat(4,1fr)}}
+  .metric{background:var(--paper2);border:1.5px solid var(--line);border-radius:12px;padding:11px 12px}
+  .metric .k{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;font-size:12px;color:var(--ink-soft)}
+  .metric .v{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:22px;margin-top:2px}
+  .metric .v small{font-size:13px;font-weight:400;color:var(--ink-soft)}
+
+  /* wind compass */
+  .wind-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .compass{width:104px;height:104px;flex:0 0 auto}
+  .wind-tip{flex:1;min-width:200px}
+  .wind-tip strong{color:var(--deep-2)}
+
+  .alert{display:flex;gap:12px;align-items:flex-start;border-radius:12px;padding:13px 14px;margin:0 0 14px;
+    border:2px solid var(--red);background:#fbeae8;color:#5a1414}
+  [data-sun="on"] .alert{background:#fff}
+  .alert.calm{border-color:var(--gold);background:#fbf4e2;color:#5a4708}
+  [data-sun="on"] .alert.calm{background:#fff}
+  .alert svg{flex:0 0 auto;margin-top:2px}
+
+  /* ---------- map ---------- */
+  #map{height:60vh;min-height:380px;width:100%;border-radius:14px;border:1.5px solid var(--line-strong);
+    box-shadow:var(--shadow);background:#dfe7e6}
+  .map-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .seg{display:inline-flex;border:1.5px solid var(--line-strong);border-radius:12px;overflow:hidden;background:var(--paper2)}
+  .seg button{border:0;background:transparent;padding:0 14px;min-height:46px;font-family:"Saira Condensed",system-ui,sans-serif;
+    text-transform:uppercase;letter-spacing:.05em;font-size:14px;color:var(--ink-soft)}
+  .seg button[aria-pressed="true"]{background:var(--deep);color:#fff}
+  .map-hint{font-size:13.5px;margin:10px 2px 0}
+  .leaflet-container{font-family:inherit}
+  .spotpin{font-size:13px;line-height:1.4}
+  .spotpin b{font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:15px}
+
+  .spotlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .spotitem{display:flex;gap:10px;align-items:center;background:var(--paper2);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px}
+  .spotitem .dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;border:2px solid #fff;box-shadow:0 0 0 1px var(--line-strong)}
+  .spotitem .meta{flex:1;min-width:0}
+  .spotitem .meta b{font-family:"Saira Condensed",system-ui,sans-serif;font-size:16px;letter-spacing:.02em}
+  .spotitem .meta .sub{font-size:12.5px;color:var(--ink-soft)}
+  .iconbtn{border:1.5px solid var(--line-strong);background:var(--card);border-radius:10px;width:44px;height:44px;display:grid;place-items:center;flex:0 0 auto}
+  .iconbtn.danger{color:var(--red);border-color:var(--red)}
+
+  /* ---------- forms ---------- */
+  label.field{display:block;margin:0 0 12px}
+  label.field .lab{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;
+    font-size:13px;color:var(--ink-soft);display:block;margin-bottom:5px}
+  input[type=text],input[type=number],select,textarea{
+    width:100%;border:1.5px solid var(--line-strong);border-radius:12px;background:var(--paper2);color:var(--ink);
+    padding:13px 14px;font-size:16px;font-family:inherit}
+  textarea{min-height:74px;resize:vertical}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .checkrow{display:flex;align-items:center;gap:10px;margin:2px 0 14px}
+  .checkrow input{width:24px;height:24px;accent-color:var(--deep)}
+
+  /* catch log */
+  .stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .stat{flex:1;min-width:96px;background:linear-gradient(180deg,var(--deep),var(--deep-2));color:#eaf5fa;
+    border-radius:12px;padding:12px 14px}
+  .stat .n{font-family:"Saira Condensed",system-ui,sans-serif;font-size:30px;font-weight:700;line-height:1}
+  .stat .l{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#bfe0ee;margin-top:3px}
+  .logitem{border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--paper2)}
+  .logitem .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .logitem .sp{font-family:"Saira Condensed",system-ui,sans-serif;font-size:20px;font-weight:700;letter-spacing:.02em;color:var(--deep-2)}
+  .logitem .size{font-family:"IBM Plex Mono",monospace;font-weight:600}
+  .logitem .when{font-size:12.5px;color:var(--ink-soft)}
+  .logitem .det{font-size:14px;margin-top:6px}
+  .logitem .cond{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft);margin-top:6px;
+    border-top:1px dashed var(--line);padding-top:6px}
+  .empty{text-align:center;color:var(--ink-soft);padding:26px 10px}
+  .empty svg{opacity:.5;margin-bottom:8px}
+
+  /* regs */
+  .reg-table{width:100%;border-collapse:collapse;font-size:14.5px;margin-top:4px}
+  .reg-table th,.reg-table td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  .reg-table th{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-size:12.5px}
+  .reg-table td .lim{font-family:"IBM Plex Mono",monospace;font-weight:600}
+  .linklist{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .linklist a{display:flex;align-items:center;gap:10px;text-decoration:none;background:var(--paper2);
+    border:1.5px solid var(--line-strong);border-radius:12px;padding:13px 14px;min-height:var(--tap);font-weight:700;color:var(--deep-2)}
+  .linklist a .arr{margin-left:auto;color:var(--ink-soft)}
+  .checklist{list-style:none;margin:6px 0 0;padding:0}
+  .checklist li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--line)}
+  .checklist li:last-child{border-bottom:0}
+  .checklist .bx{width:22px;height:22px;border:2px solid var(--deep);border-radius:6px;flex:0 0 auto;margin-top:2px}
+  .note{font-size:13px;color:var(--ink-soft);margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+
+  .results{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:50;background:var(--card);
+    border:1.5px solid var(--line-strong);border-radius:14px;box-shadow:0 18px 40px -18px rgba(9,58,82,.6);overflow:hidden}
+  .res-msg{padding:14px;font-size:14px;color:var(--ink-soft);line-height:1.45}
+  .res-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;
+    border-bottom:1px solid var(--line);padding:12px 14px;min-height:58px}
+  .res-item:last-child{border-bottom:0}
+  .res-item:hover,.res-item:focus-visible{background:var(--paper2)}
+  .res-main{display:flex;flex-direction:column;flex:1;min-width:0}
+  .res-main b{font-family:"Saira Condensed",system-ui,sans-serif;font-size:17px;letter-spacing:.02em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--deep-2)}
+  .res-sub{font-size:12.5px;color:var(--ink-soft)}
+  .tagpill{flex:0 0 auto;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;
+    font-size:11px;color:var(--deep-2);background:var(--paper);border:1.5px solid var(--line-strong);border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .linkbtn{background:none;border:0;padding:0;color:var(--deep);text-decoration:underline;font:inherit;font-weight:700;cursor:pointer}
+  [data-sun="on"] .linkbtn{color:var(--deep-2)}
+
+  /* hourly bite strip */
+  .hours-sum{font-size:14.5px;margin:0 0 12px;line-height:1.45}
+  .hours-sum b{color:var(--deep-2);font-family:"Saira Condensed",system-ui,sans-serif;font-size:17px;letter-spacing:.02em}
+  .hours{display:flex;gap:7px;overflow-x:auto;padding:4px 2px 6px;-webkit-overflow-scrolling:touch}
+  .hr{flex:0 0 auto;width:38px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .hr .s{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-soft);height:14px}
+  .hr .col{width:22px;height:86px;background:var(--paper2);border:1.5px solid var(--line);border-radius:7px;display:flex;align-items:flex-end;overflow:hidden}
+  .hr .fill{width:100%;border-radius:0 0 5px 5px;transition:height .5s ease}
+  .hr .t{font-family:"Saira Condensed",system-ui,sans-serif;font-size:12px;color:var(--ink-soft);letter-spacing:.02em}
+  .hr.now .col{border-color:var(--ink);border-width:2.5px}
+  .hr.now .t{color:var(--ink);font-weight:700}
+  .hr.peak .s{color:var(--hot);font-weight:700}
+  .hr.peak .col{box-shadow:0 0 0 2px var(--hot)}
+
+  /* keep / release verdict */
+  .verdict-box{border:2px solid var(--line-strong);border-left-width:7px;border-radius:12px;padding:13px 15px;margin-top:14px}
+  .verdict-box .vh{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:18px;font-weight:700;margin-bottom:4px}
+  .verdict-box.keep{border-color:var(--green)} .verdict-box.keep .vh{color:var(--green)}
+  .verdict-box.release{border-color:var(--red)} .verdict-box.release .vh{color:var(--red)}
+  .verdict-box.neutral{border-color:var(--shallow)} .verdict-box.neutral .vh{color:var(--deep-2)}
+  .verdict-box.check{border-color:var(--gold)} .verdict-box.check .vh{color:var(--gold)}
+  .verdict-box .sub{font-size:14.5px}
+  .verdict-box .bag{font-family:"IBM Plex Mono",monospace;font-size:12px;margin-top:8px;color:var(--ink-soft);border-top:1px dashed var(--line);padding-top:8px}
+
+  /* what to use here */
+  .picks{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .pick{display:flex;gap:12px;align-items:flex-start;background:var(--paper2);border:1.5px solid var(--line);border-radius:12px;padding:11px 13px}
+  .pick .pic{flex:0 0 auto;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--deep);color:#fff;font-family:"Saira Condensed",system-ui,sans-serif;font-size:20px;font-weight:700}
+  .pick .pn{font-family:"Saira Condensed",system-ui,sans-serif;font-size:17px;letter-spacing:.02em;color:var(--deep-2)}
+  .pick .pd{font-size:14px;margin-top:2px}
+
+  /* glossary */
+  details.gloss{border:1.5px solid var(--line);border-radius:12px;background:var(--paper2);padding:0 14px;margin-top:4px}
+  details.gloss summary{cursor:pointer;padding:14px 0;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--deep-2);list-style:none;display:flex;align-items:center;min-height:30px}
+  details.gloss summary::-webkit-details-marker{display:none}
+  details.gloss summary::after{content:"+";margin-left:auto;font-size:22px;line-height:1}
+  details.gloss[open] summary::after{content:"–"}
+  .gl{margin:0 0 12px}
+  .gl dt{font-family:"Saira Condensed",system-ui,sans-serif;font-size:15.5px;letter-spacing:.02em;color:var(--ink);margin-top:11px}
+  .gl dd{margin:2px 0 0;font-size:14px;color:var(--ink-soft)}
+
+  /* ---------- bottom nav ---------- */
+  nav.tabs{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    background:var(--card);border-top:2px solid var(--line-strong);
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom,0));
+    display:flex;max-width:760px;margin:0 auto;
+    box-shadow:0 -10px 26px -18px rgba(9,58,82,.7);
+  }
+  nav.tabs button{flex:1;background:transparent;border:0;border-radius:12px;padding:8px 2px;min-height:60px;
+    display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink-soft)}
+  nav.tabs button .tlab{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:12.5px}
+  nav.tabs button[aria-selected="true"]{color:var(--deep);background:var(--paper2)}
+  nav.tabs button[aria-selected="true"] .ic{transform:translateY(-1px)}
+  nav.tabs svg{width:26px;height:26px}
+
+  .skeleton{background:linear-gradient(90deg,var(--paper2),var(--card),var(--paper2));border-radius:10px;height:14px;animation:sk 1.2s infinite}
+  @keyframes sk{0%{opacity:.6}50%{opacity:1}100%{opacity:.6}}
+  .spin{animation:spin 1s linear infinite;transform-origin:center}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brandrow">
+      <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+        <g fill="none" stroke="#CFE6F0" stroke-width="2">
+          <path d="M3 13h34M3 21h34M3 29h34" opacity=".5"/>
+        </g>
+        <path d="M6 21c5-9 23-9 28 0-5 9-23 9-28 0z" fill="#E8731C" stroke="#fff" stroke-width="1.6"/>
+        <circle cx="25" cy="19.5" r="2.1" fill="#093A52"/>
+        <path d="M30 21l8-4-2 4 2 4z" fill="#CFE6F0"/>
+      </svg>
+      <div class="brand">
+        <h1 class="display">Soundline</h1>
+        <p>Read the water before you wet a line · Ohio</p>
+      </div>
+      <button class="sun-toggle" id="sunBtn" aria-pressed="false" aria-label="Toggle high-sun high-contrast mode">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
+        <span>Sun</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- shared location bar -->
+    <div class="locbar" id="locbar">
+      <form id="searchForm" role="search">
+        <input type="search" id="searchInput" placeholder="Search a lake, river, or town…" aria-label="Search a fishing location" autocomplete="off" />
+        <button class="btn" type="submit" aria-label="Search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        </button>
+      </form>
+      <button class="btn ghost" id="geoBtn" aria-label="Use my current location" title="Use my location">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+      <div class="results" id="searchResults" role="listbox" aria-label="Search results" hidden></div>
+    </div>
+
+    <!-- ============ NOW / CONDITIONS ============ -->
+    <section class="panel active" id="panel-now" role="tabpanel" aria-labelledby="tab-now">
+      <div class="place" id="placeHead">
+        <span class="name display" id="placeName">Lake Erie — Cleveland</span>
+        <span class="coords mono muted" id="placeCoords">41.51, -81.71</span>
+      </div>
+      <div class="chips" id="quickWaters" aria-label="Quick Ohio waters"></div>
+
+      <div id="alertSlot"></div>
+
+      <div class="card" id="manualCard" hidden>
+        <h2>Enter conditions</h2>
+        <p class="tiny muted" style="margin:-4px 0 12px">No signal? Read these off the sky and water and Soundline still rates the bite.</p>
+        <div class="grid2">
+          <label class="field"><span class="lab">Pressure</span>
+            <select id="mTrend"><option value="falling">Falling / front coming</option><option value="steady" selected>Steady</option><option value="rising">Rising / clearing</option></select></label>
+          <label class="field"><span class="lab">Sky &amp; time</span>
+            <select id="mSky"><option value="low">Dawn or dusk</option><option value="overcast">Overcast day</option><option value="bright" selected>Bright midday</option><option value="night">After dark</option></select></label>
+        </div>
+        <div class="grid2">
+          <label class="field"><span class="lab">Wind (mph)</span><input type="number" id="mWind" inputmode="numeric" min="0" step="1" value="6"></label>
+          <label class="field"><span class="lab">Wind from</span><select id="mDir"></select></label>
+        </div>
+        <div class="checkrow"><input type="checkbox" id="mRain"><label for="mRain">Light rain / drizzle</label></div>
+        <button class="btn block" id="mGo">Rate the bite</button>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">Bite forecast — right now</p>
+        <div class="gauge-wrap">
+          <svg class="gauge" id="gauge" viewBox="0 0 320 188" role="img" aria-labelledby="gaugeTitle">
+            <title id="gaugeTitle">Bite forecast gauge</title>
+            <!-- track -->
+            <path id="trk" d="M30 168 A130 130 0 0 1 290 168" fill="none" stroke="var(--line)" stroke-width="20" stroke-linecap="round"/>
+            <!-- fill -->
+            <path id="fill" d="M30 168 A130 130 0 0 1 290 168" fill="none" stroke="var(--shallow)" stroke-width="20" stroke-linecap="round"/>
+            <!-- sonar rings -->
+            <path d="M70 168 A90 90 0 0 1 250 168" fill="none" stroke="var(--line)" stroke-width="1.5" opacity=".7"/>
+            <path d="M110 168 A50 50 0 0 1 210 168" fill="none" stroke="var(--line)" stroke-width="1.5" opacity=".7"/>
+            <!-- ticks -->
+            <g id="ticks" stroke="var(--ink-soft)" stroke-width="2"></g>
+            <!-- needle -->
+            <line id="needle" x1="160" y1="168" x2="160" y2="58" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="160" cy="168" r="9" fill="var(--ink)"/>
+            <circle cx="160" cy="168" r="3.4" fill="var(--paper)"/>
+          </svg>
+          <div class="gauge-read">
+            <div class="score display" id="scoreNum">—</div>
+            <div class="verdict" id="verdict">Loading…</div>
+          </div>
+          <div class="gauge-legend">
+            <span style="background:#6b7b85">Slow 0–29</span>
+            <span style="background:var(--gold)">Fair 30–54</span>
+            <span style="background:var(--shallow)">Good 55–77</span>
+            <span style="background:var(--hot)">Prime 78+</span>
+          </div>
+        </div>
+        <ul class="factors" id="factors"></ul>
+        <p class="note">A read on conditions, not a promise. Pressure trends, low light, wind, and sky are weighed — fish, season, and water still have the final say. <button class="linkbtn" id="manualToggle">No signal? Enter conditions →</button></p>
+      </div>
+
+      <div class="card" id="hoursCard">
+        <h2>When to go today</h2>
+        <p class="hours-sum" id="hoursSum"><span class="skeleton" style="display:block;width:70%"></span></p>
+        <div class="hours" id="hours" role="img" aria-label="Hourly bite forecast for the next several hours"></div>
+      </div>
+
+      <div class="card">
+        <h2>Conditions</h2>
+        <div class="metrics" id="metrics"></div>
+      </div>
+
+      <div class="card">
+        <h2>Wind &amp; where to fish</h2>
+        <div class="wind-row">
+          <svg class="compass" id="compass" viewBox="0 0 100 100" role="img" aria-label="Wind direction compass">
+            <circle cx="50" cy="50" r="46" fill="var(--paper2)" stroke="var(--line-strong)" stroke-width="2"/>
+            <g font-family="Saira Condensed, sans-serif" font-size="11" fill="var(--ink-soft)" text-anchor="middle">
+              <text x="50" y="16">N</text><text x="88" y="54">E</text><text x="50" y="92">S</text><text x="12" y="54">W</text>
+            </g>
+            <g id="windArrow">
+              <path d="M50 22 L57 56 L50 49 L43 56 Z" fill="var(--hot)" stroke="#fff" stroke-width="1"/>
+            </g>
+            <circle cx="50" cy="50" r="3.5" fill="var(--ink)"/>
+          </svg>
+          <div class="wind-tip" id="windTip"><span class="skeleton" style="display:block;width:90%"></span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Where to start here</h2>
+        <label class="field" style="margin-bottom:10px"><span class="lab">Season</span><select id="seasonSel"></select></label>
+        <p class="muted tiny" id="startCtx" style="margin:-2px 0 10px"></p>
+        <ul class="picks" id="picks"></ul>
+        <p class="note">New to it? The all-rounder: a slip bobber, a small split shot, a #6 hook, and a live nightcrawler fished near cover catches bluegill, perch, crappie, and more — almost anywhere, almost any season.</p>
+      </div>
+    </section>
+
+    <!-- ============ MAP ============ -->
+    <section class="panel" id="panel-map" role="tabpanel" aria-labelledby="tab-map" hidden>
+      <div class="map-tools">
+        <div class="seg" role="group" aria-label="Map layer">
+          <button data-layer="topo" aria-pressed="true">Topo</button>
+          <button data-layer="imagery" aria-pressed="false">Imagery</button>
+          <button data-layer="street" aria-pressed="false">Street</button>
+        </div>
+        <button class="btn ghost" id="mapGeoBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          My location
+        </button>
+        <button class="btn" id="mapHereBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 16a4 4 0 0 1 1-7.9A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>
+          Conditions here
+        </button>
+      </div>
+      <div id="map" aria-label="Topographic map of fishing area"></div>
+      <p class="map-hint muted">Center the map on any pond, backwater, or park lake — even an unnamed one — and tap <strong>Conditions here</strong> for its bite forecast. Tap the map to drop and label a marker (drop-off, weed bed, point, inlet, structure, ramp). USGS topo lines show depth contours and shoreline structure. Markers save on this device.</p>
+
+      <div class="card" style="margin-top:14px">
+        <h2>My spots</h2>
+        <ul class="spotlist" id="spotList"></ul>
+      </div>
+    </section>
+
+    <!-- ============ LOG ============ -->
+    <section class="panel" id="panel-log" role="tabpanel" aria-labelledby="tab-log" hidden>
+      <div class="stat-row" id="logStats"></div>
+
+      <div class="card">
+        <h2>Log a catch</h2>
+        <label class="field">
+          <span class="lab">Species</span>
+          <input type="text" id="cSpecies" list="speciesList" placeholder="e.g. Walleye" autocomplete="off">
+          <datalist id="speciesList"></datalist>
+        </label>
+        <div class="grid2">
+          <label class="field"><span class="lab">Length (in)</span><input type="number" id="cLen" inputmode="decimal" step="0.25" min="0" placeholder="0"></label>
+          <label class="field"><span class="lab">Weight (lb · opt.)</span><input type="number" id="cWt" inputmode="decimal" step="0.1" min="0" placeholder="0"></label>
+        </div>
+        <label class="field"><span class="lab">Bait / lure</span><input type="text" id="cBait" placeholder="e.g. jig &amp; minnow, crankbait"></label>
+        <label class="field"><span class="lab">Water</span><input type="text" id="cWater" placeholder="e.g. Lake Erie, Alum Creek"></label>
+        <label class="field"><span class="lab">Notes</span><textarea id="cNotes" placeholder="Depth, structure, how it hit…"></textarea></label>
+        <div class="checkrow">
+          <input type="checkbox" id="cAttach" checked>
+          <label for="cAttach">Attach current conditions (pressure, wind, temp)</label>
+        </div>
+        <button class="btn hot block" id="addCatch">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+          Save catch
+        </button>
+      </div>
+
+      <div class="card">
+        <h2>History</h2>
+        <div id="logList"></div>
+      </div>
+    </section>
+
+    <!-- ============ REGS ============ -->
+    <section class="panel" id="panel-regs" role="tabpanel" aria-labelledby="tab-regs" hidden>
+      <div class="alert calm" style="border-color:var(--deep);background:var(--paper2);color:var(--ink)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--deep)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+        <div><strong>Verify before you go.</strong> Ohio rules run March 1 → Feb 28 and change yearly. Limits below are general statewide <em>inland</em> guidance for the 2026–27 season — <strong>Lake Erie and many specific waters differ.</strong> ODNR is the law; this app is not.</div>
+      </div>
+
+      <div class="card">
+        <h2>Keep or release?</h2>
+        <div class="seg" role="group" aria-label="Water type" style="margin-bottom:12px">
+          <button id="krInland" type="button" data-water="inland" aria-pressed="true">Inland</button>
+          <button id="krErie" type="button" data-water="erie" aria-pressed="false">Lake Erie</button>
+        </div>
+        <label class="field"><span class="lab">Species</span><input type="text" id="krSpecies" list="speciesList" placeholder="e.g. Walleye" autocomplete="off"></label>
+        <label class="field"><span class="lab">Length (in) — tip of mouth to tip of tail</span><input type="number" id="krLen" inputmode="decimal" step="0.25" min="0" placeholder="0"></label>
+        <button class="btn block" id="krGo">Check it</button>
+        <div id="krResult"></div>
+      </div>
+
+      <div class="card">
+        <h2>Official sources</h2>
+        <ul class="linklist">
+          <li><a href="https://ohiodnr.gov/discover-and-learn/seasons-and-regulations/fishing-regulations" target="_blank" rel="noopener">ODNR Fishing Regulations<span class="arr">↗</span></a></li>
+          <li><a href="https://ohiodnr.gov/discover-and-learn/seasons-and-regulations/fishing-licenses" target="_blank" rel="noopener">Licenses &amp; Lake Erie permit<span class="arr">↗</span></a></li>
+          <li><a href="https://www.takemefishing.org/ohio/" target="_blank" rel="noopener">Take Me Fishing — Ohio (where to fish)<span class="arr">↗</span></a></li>
+          <li><a href="https://eregulations.com/ohio/fishing" target="_blank" rel="noopener">Digital regulations digest<span class="arr">↗</span></a></li>
+        </ul>
+        <p class="note">Free fishing days for residents: <strong>June 20–21, 2026</strong> (no license needed, but all size and bag limits still apply). A license is required for anglers 16+. Questions: 1-800-WILDLIFE (1-800-945-3543).</p>
+      </div>
+
+      <div class="card">
+        <h2>Common inland limits</h2>
+        <table class="reg-table">
+          <thead><tr><th>Species</th><th>Daily bag</th><th>Min size</th></tr></thead>
+          <tbody>
+            <tr><td>Black bass (LM/SM/spotted, combined)</td><td class="lim">5</td><td class="lim">12"</td></tr>
+            <tr><td>Walleye / saugeye / sauger (aggregate)</td><td class="lim">6</td><td>15"*</td></tr>
+            <tr><td>Yellow perch</td><td class="lim">30</td><td>—</td></tr>
+            <tr><td>Muskellunge / tiger muskie</td><td class="lim">1</td><td class="lim">30"</td></tr>
+            <tr><td>Trout / salmon (inland)</td><td class="lim">5</td><td>—</td></tr>
+            <tr><td>Crappie &amp; other panfish</td><td>varies</td><td>varies</td></tr>
+          </tbody>
+        </table>
+        <p class="note">*The 15" walleye/saugeye minimum was removed on several inland lakes for 2026–27 — confirm your water. Lake Erie sets its own walleye, perch, and bass seasons and limits by zone. Protected species (lake sturgeon, several gars, cisco, and more) must be released immediately.</p>
+      </div>
+
+      <div class="card">
+        <h2>Pre-trip checklist</h2>
+        <ul class="checklist">
+          <li><span class="bx"></span><span>Current fishing license on you (plus Lake Erie permit if fishing Erie or its tributaries)</span></li>
+          <li><span class="bx"></span><span>Checked seasons &amp; bag/size limits for <em>this</em> water on ODNR</span></li>
+          <li><span class="bx"></span><span>Life jacket per person; check the marine/lake forecast for wind &amp; storms</span></li>
+          <li><span class="bx"></span><span>Tell someone your launch point and return time</span></li>
+          <li><span class="bx"></span><span>Clean, drain, dry gear between waters — stop invasive species</span></li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Angler's glossary</h2>
+        <details class="gloss">
+          <summary>Plain-language terms</summary>
+          <dl class="gl">
+            <dt>Structure</dt><dd>The permanent shape of the bottom — drop-offs, humps, points, channels. Fish relate to it.</dd>
+            <dt>Cover</dt><dd>Things fish hide in or under — weeds, logs, docks, rocks, brush.</dd>
+            <dt>Drop-off</dt><dd>Where shallow water falls quickly into deep. A highway and an ambush spot.</dd>
+            <dt>Point</dt><dd>A finger of land or bottom reaching into the water; it concentrates fish and bait.</dd>
+            <dt>Flat</dt><dd>A wide, shallow, fairly even area — good in spring and at low light.</dd>
+            <dt>Windward shore</dt><dd>The bank the wind blows toward. Baitfish pile up there, and so do feeding fish.</dd>
+            <dt>Chop</dt><dd>Light wind-driven surface waves. Breaks up the light and often turns fish on.</dd>
+            <dt>Falling pressure</dt><dd>Barometer dropping as a front moves in — frequently the best bite window.</dd>
+            <dt>Low light</dt><dd>Dawn, dusk, and overcast — prime feeding times for most species.</dd>
+            <dt>Jig</dt><dd>A weighted hook, often dressed with soft plastic or live bait, bounced near bottom. The do-everything lure.</dd>
+            <dt>Crankbait</dt><dd>A diving plug you reel steadily to cover water and trigger reaction strikes.</dd>
+            <dt>Slip bobber</dt><dd>A float that slides on the line so you can fish bait at a set depth. Beginner gold.</dd>
+            <dt>Total length</dt><dd>How fish are measured for limits: closed mouth to pinched tail tip, laid flat.</dd>
+            <dt>Minimum &amp; slot</dt><dd>Size rules: a minimum means keep only fish that long or longer; a slot protects a mid-size range.</dd>
+            <dt>Catch and release</dt><dd>Returning fish unharmed — wet your hands, support the belly, get it back in fast.</dd>
+          </dl>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button id="tab-now" role="tab" aria-selected="true" aria-controls="panel-now" data-tab="now">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 14c2-3 5-3 7 0s5 3 7 0 4-3 4-3"/><path d="M3 9c2-3 5-3 7 0s5 3 7 0 4-3 4-3"/><path d="M3 19c2-3 5-3 7 0s5 3 7 0 4-3 4-3"/></svg></span>
+      <span class="tlab">Now</span>
+    </button>
+    <button id="tab-map" role="tab" aria-selected="false" aria-controls="panel-map" data-tab="map">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3z"/><path d="M9 3v15M15 6v15"/></svg></span>
+      <span class="tlab">Map</span>
+    </button>
+    <button id="tab-log" role="tab" aria-selected="false" aria-controls="panel-log" data-tab="log">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13l3 3v13H4z"/><path d="M8 10h8M8 14h8M8 18h5"/></svg></span>
+      <span class="tlab">Log</span>
+    </button>
+    <button id="tab-regs" role="tab" aria-selected="false" aria-controls="panel-regs" data-tab="regs">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h11l3 3v15H5z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>
+      <span class="tlab">Regs</span>
+    </button>
+  </nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+/* ---------------- state + storage ---------------- */
+var mem = {}; // fallback if window.storage unavailable
+async function sget(key){
+  try{ if(window.storage){ var r = await window.storage.get(key,false); return r ? JSON.parse(r.value) : null; } }catch(e){}
+  return (key in mem) ? mem[key] : null;
+}
+async function sset(key,val){
+  mem[key]=val;
+  try{ if(window.storage){ await window.storage.set(key, JSON.stringify(val), false); } }catch(e){}
+}
+
+var state = {
+  loc:{lat:41.51,lon:-81.71,name:"Lake Erie — Cleveland"},
+  weather:null,
+  spots:[],
+  catches:[],
+  sun:false,
+  map:null, layer:null, layerKey:"topo", spotLayer:null, meMarker:null, mapReady:false
+};
+
+var QUICK = [
+  {n:"Lake Erie — Cleveland",lat:41.51,lon:-81.71},
+  {n:"Lake Erie — Sandusky Bay",lat:41.46,lon:-82.71},
+  {n:"Maumee River — Toledo",lat:41.58,lon:-83.68},
+  {n:"Alum Creek Lake",lat:40.21,lon:-82.98},
+  {n:"Caesar Creek Lake",lat:39.49,lon:-84.06},
+  {n:"Mosquito Creek Lake",lat:41.30,lon:-80.76},
+  {n:"Salt Fork Lake",lat:40.10,lon:-81.45},
+  {n:"Hoover Reservoir",lat:40.13,lon:-82.87}
+];
+
+var SPECIES = ["Walleye","Saugeye","Sauger","Yellow Perch","Smallmouth Bass","Largemouth Bass","Spotted Bass","White Bass","Black Crappie","White Crappie","Bluegill","Channel Catfish","Flathead Catfish","Blue Catfish","Muskellunge","Tiger Muskie","Northern Pike","Steelhead","Rainbow Trout","Brown Trout","Brook Trout","Freshwater Drum","Rock Bass","Bullhead"];
+
+var $ = function(s,r){ return (r||document).querySelector(s); };
+var $$ = function(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+
+/* ---------------- init ---------------- */
+(async function init(){
+  // sun pref
+  var sun = await sget("sun"); if(sun){ state.sun=true; applySun(); }
+  state.spots = (await sget("spots")) || [];
+  state.catches = (await sget("catches")) || [];
+
+  // species datalist
+  var dl = $("#speciesList"); SPECIES.forEach(function(s){ var o=document.createElement("option"); o.value=s; dl.appendChild(o); });
+  // wind-direction options for manual entry
+  var md=$("#mDir"); DIRS.forEach(function(dir){ var o=document.createElement("option"); o.value=dir; o.textContent=dir; md.appendChild(o); }); md.value="SW";
+  // season selector for "where to start"
+  var ss=$("#seasonSel");
+  [["spring","Spring (Mar–May)"],["summer","Summer (Jun–Aug)"],["fall","Fall (Sep–Nov)"],["winter","Winter (Dec–Feb)"]].forEach(function(o){
+    var op=document.createElement("option"); op.value=o[0]; op.textContent=o[1]; ss.appendChild(op);
+  });
+  ss.value=currentSeason();
+  state.krWater="inland";
+
+  buildQuickWaters();
+  renderPlace();
+  renderSpotList();
+  renderLog();
+  renderPicks();
+  bindTabs();
+  bindControls();
+  fetchWeather();
+})();
+
+/* ---------------- tabs ---------------- */
+function bindTabs(){
+  $$('nav.tabs button').forEach(function(b){
+    b.addEventListener('click', function(){ showTab(b.dataset.tab); });
+  });
+}
+function showTab(name){
+  $$('nav.tabs button').forEach(function(b){ b.setAttribute('aria-selected', String(b.dataset.tab===name)); });
+  $$('.panel').forEach(function(p){ var on = p.id==='panel-'+name; p.classList.toggle('active',on); p.hidden=!on; });
+  // location bar only relevant to Now + Map
+  $("#locbar").style.display = (name==='now'||name==='map') ? 'flex' : 'none';
+  if(name==='map'){ ensureMap(); }
+  window.scrollTo({top:0,behavior:'instant' in window ? 'instant':'auto'});
+}
+
+/* ---------------- controls ---------------- */
+function bindControls(){
+  $("#sunBtn").addEventListener('click', function(){
+    state.sun=!state.sun; applySun(); sset("sun", state.sun);
+  });
+  $("#searchForm").addEventListener('submit', function(e){ e.preventDefault(); doSearch(); });
+  $("#geoBtn").addEventListener('click', useGeo);
+  $("#mapGeoBtn").addEventListener('click', useGeo);
+  $("#addCatch").addEventListener('click', addCatch);
+
+  $$('.seg button').forEach(function(b){
+    b.addEventListener('click', function(){ setLayer(b.dataset.layer); });
+  });
+
+  $("#manualToggle").addEventListener('click', revealManual);
+  $("#mGo").addEventListener('click', runManual);
+  $("#mapHereBtn").addEventListener('click', function(){
+    if(!state.map){ ensureMap(); }
+    if(state.map){ var ctr=state.map.getCenter(); setLoc(ctr.lat, ctr.lng, "Map point"); showTab('now'); }
+  });
+  $("#searchInput").addEventListener('keydown', function(e){ if(e.key==='Escape') hideResults(); });
+  document.addEventListener('click', function(e){ if(!e.target.closest('#locbar')) hideResults(); });
+
+  $("#krGo").addEventListener('click', runKeepRelease);
+  $("#krInland").addEventListener('click', function(){ setKrWater('inland'); });
+  $("#krErie").addEventListener('click', function(){ setKrWater('erie'); });
+  $("#seasonSel").addEventListener('change', renderPicks);
+}
+function applySun(){
+  document.documentElement.setAttribute('data-sun', state.sun?'on':'off');
+  var b=$("#sunBtn"); b.setAttribute('aria-pressed', String(state.sun));
+}
+
+function buildQuickWaters(){
+  var wrap=$("#quickWaters"); wrap.innerHTML="";
+  QUICK.forEach(function(q){
+    var b=document.createElement('button');
+    b.className="chip water"; b.type="button"; b.textContent=q.n.replace("Lake Erie — ","").replace(" Lake","").replace(" Reservoir","");
+    b.title=q.n;
+    b.addEventListener('click', function(){ setLoc(q.lat,q.lon,q.n); });
+    wrap.appendChild(b);
+  });
+}
+
+function setLoc(lat,lon,name){
+  state.loc={lat:lat,lon:lon,name:name};
+  renderPlace(); fetchWeather();
+  if(state.mapReady && state.map){ state.map.setView([lat,lon], Math.max(state.map.getZoom(),11)); }
+}
+function renderPlace(){
+  $("#placeName").textContent = state.loc.name;
+  $("#placeCoords").textContent = state.loc.lat.toFixed(2)+", "+state.loc.lon.toFixed(2);
+}
+
+/* ---------------- search / geo ---------------- */
+async function doSearch(){
+  var q=$("#searchInput").value.trim(); if(!q) return;
+  var btn=$("#searchForm button"); btn.disabled=true;
+  showResults('<div class="res-msg">Searching parks, ponds, lakes &amp; towns…</div>');
+  var found=[];
+  try{
+    var u="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&countrycodes=us&q="+encodeURIComponent(q);
+    var r=await fetch(u,{headers:{"Accept":"application/json"}});
+    var d=await r.json();
+    found=(d||[]).map(function(it){
+      var a=it.address||{};
+      var nm=it.name || it.display_name.split(",")[0];
+      var sub=[a.city||a.town||a.village||a.hamlet||a.county, a.state].filter(Boolean).join(", ");
+      return {lat:parseFloat(it.lat), lon:parseFloat(it.lon), name:nm, sub:sub, kind:(it.type||it.category||"").replace(/_/g," ")};
+    });
+  }catch(e){}
+  if(!found.length){
+    try{
+      var r2=await fetch("https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name="+encodeURIComponent(q));
+      var d2=await r2.json();
+      found=((d2&&d2.results)||[]).map(function(g){
+        return {lat:g.latitude, lon:g.longitude, name:g.name, sub:[g.admin2,g.admin1].filter(Boolean).join(", "), kind:g.feature_code==="PPL"?"town":""};
+      });
+    }catch(e2){}
+  }
+  btn.disabled=false;
+  if(!found.length){
+    showResults('<div class="res-msg">No match for &ldquo;'+escapeHTML(q)+'&rdquo;. In this preview, outside searches are blocked &mdash; open the downloaded file in your browser, or use the <strong>Map</strong> tab to drop a pin on any pond and tap &ldquo;Conditions here.&rdquo;</div>');
+    return;
+  }
+  renderResults(found);
+}
+function showResults(html){ var el=$("#searchResults"); el.innerHTML=html; el.hidden=false; }
+function hideResults(){ var el=$("#searchResults"); el.hidden=true; el.innerHTML=""; }
+function renderResults(list){
+  var el=$("#searchResults"); el.innerHTML="";
+  list.forEach(function(g){
+    var b=document.createElement('button'); b.type="button"; b.className="res-item"; b.setAttribute("role","option");
+    b.innerHTML='<span class="res-main"><b>'+escapeHTML(g.name)+'</b>'+(g.sub?'<span class="res-sub">'+escapeHTML(g.sub)+'</span>':'')+'</span>'+(g.kind?'<span class="tagpill">'+escapeHTML(g.kind)+'</span>':'');
+    b.addEventListener('click', function(){ setLoc(g.lat, g.lon, g.name); $("#searchInput").value=""; hideResults(); });
+    el.appendChild(b);
+  });
+  el.hidden=false;
+}
+function useGeo(){
+  if(!navigator.geolocation){ flashAlert("calm","Location off","This device or browser won't share location here. Use search instead."); return; }
+  navigator.geolocation.getCurrentPosition(function(p){
+    setLoc(p.coords.latitude, p.coords.longitude, "Current location");
+  }, function(){
+    flashAlert("calm","Location blocked","Couldn't get your position. Search for the water by name instead.");
+  }, {enableHighAccuracy:true, timeout:9000, maximumAge:60000});
+}
+
+/* ---------------- weather ---------------- */
+async function fetchWeather(){
+  setLoadingNow();
+  var p = new URLSearchParams({
+    latitude: state.loc.lat, longitude: state.loc.lon,
+    current: "temperature_2m,apparent_temperature,relative_humidity_2m,is_day,precipitation,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m",
+    hourly: "surface_pressure,weather_code,precipitation,wind_speed_10m,cloud_cover",
+    daily: "sunrise,sunset",
+    temperature_unit:"fahrenheit", wind_speed_unit:"mph", precipitation_unit:"inch",
+    timezone:"auto", past_days:1, forecast_days:2
+  });
+  try{
+    var r = await fetch("https://api.open-meteo.com/v1/forecast?"+p.toString());
+    if(!r.ok) throw new Error("bad");
+    var d = await r.json();
+    state.weather = d;
+    renderNow(d);
+  }catch(e){
+    state.weather=null;
+    $("#scoreNum").textContent="—"; $("#verdict").textContent="No data";
+    $("#metrics").innerHTML="";
+    $("#factors").innerHTML="";
+    $("#windTip").innerHTML="";
+    $("#hoursSum").textContent="Hourly outlook needs a live connection."; $("#hours").innerHTML="";
+    $("#alertSlot").innerHTML='<div class="alert calm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 16a4 4 0 0 1 1-7.9A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9"/><path d="M8 13v6M16 13v6M12 15v6"/></svg><div><strong>No live weather here.</strong> This preview window blocks outside data. Open the downloaded file in your phone or desktop browser for automatic conditions &mdash; or <button class="linkbtn" id="openManual">enter them by hand &rarr;</button></div></div>';
+    var om=$("#openManual"); if(om) om.addEventListener('click', revealManual);
+  }
+}
+function setLoadingNow(){
+  $("#scoreNum").textContent="…"; $("#verdict").textContent="Reading water…";
+  $("#metrics").innerHTML='<div class="metric"><span class="skeleton" style="display:block;width:80%"></span></div>'.repeat(4);
+  $("#factors").innerHTML=""; $("#alertSlot").innerHTML="";
+  $("#hoursSum").innerHTML='<span class="skeleton" style="display:block;width:70%"></span>'; $("#hours").innerHTML="";
+}
+
+var DIRS=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+function compass(deg){ return DIRS[Math.round((deg%360)/22.5)%16]; }
+function opp(deg){ return (deg+180)%360; }
+
+function renderNow(d){
+  var c=d.current;
+  var hours=d.hourly.time, press=d.hourly.surface_pressure;
+  // find current index
+  var nowISO=c.time;
+  var idx=hours.indexOf(nowISO);
+  if(idx<0){ // nearest
+    var t=new Date(nowISO).getTime(); var best=0,bd=1e15;
+    for(var i=0;i<hours.length;i++){ var diff=Math.abs(new Date(hours[i]).getTime()-t); if(diff<bd){bd=diff;best=i;} }
+    idx=best;
+  }
+  var p3 = (idx>=3 && press[idx-3]!=null) ? (press[idx]-press[idx-3]) : 0; // 3-hr tendency (hPa)
+  var trend = p3 <= -1.5 ? "falling" : p3 >= 1.5 ? "rising" : "steady";
+
+  // sun times
+  var sr=new Date(d.daily.sunrise[0]), ss=new Date(d.daily.sunset[0]);
+  var now=new Date();
+  var minsTo=function(x){ return Math.abs(x.getTime()-now.getTime())/60000; };
+  var lowLight = Math.min(minsTo(sr), minsTo(ss));
+  var isDay = c.is_day===1;
+
+  // ----- bite score -----
+  var w=c.wind_speed_10m;
+  var stormSoon=false;
+  for(var k=idx;k<Math.min(idx+6,hours.length);k++){ if([95,96,99].indexOf(d.hourly.weather_code[k])>=0){ stormSoon=true; break; } }
+  var lightRain=[51,53,55,61,63,80,81].indexOf(c.weather_code)>=0;
+  applyBite(computeBite({
+    trend:trend,
+    lowLight: lowLight<=75,
+    overcastDay: isDay && c.cloud_cover>=65 && lowLight>75,
+    brightDay: isDay && c.cloud_cover<25 && lowLight>75,
+    wind:w, lightRain:lightRain, stormSoon:stormSoon
+  }));
+
+  // ----- metrics -----
+  var trendArrow = trend==="falling"?"↓":trend==="rising"?"↑":"→";
+  var M=[
+    ["Air temp", Math.round(c.temperature_2m), "°F"],
+    ["Feels", Math.round(c.apparent_temperature), "°F"],
+    ["Pressure", c.surface_pressure.toFixed(0)+" "+trendArrow, "hPa "+trend],
+    ["Wind", Math.round(c.wind_speed_10m), "mph "+compass(c.wind_direction_10m)],
+    ["Gusts", Math.round(c.wind_gusts_10m), "mph"],
+    ["Cloud", Math.round(c.cloud_cover), "%"],
+    ["Humidity", Math.round(c.relative_humidity_2m), "%"],
+    ["Sun", fmtTime(sr)+" / "+fmtTime(ss), "rise / set"]
+  ];
+  var mg=$("#metrics"); mg.innerHTML="";
+  M.forEach(function(m){
+    var div=document.createElement('div'); div.className="metric";
+    div.innerHTML='<div class="k">'+m[0]+'</div><div class="v">'+m[1]+' <small>'+m[2]+'</small></div>';
+    mg.appendChild(div);
+  });
+
+  // ----- wind compass + tip -----
+  updateWind(c.wind_direction_10m, w);
+
+  // ----- alerts -----
+  var slot=$("#alertSlot"); slot.innerHTML="";
+  if(stormSoon){
+    slot.innerHTML='<div class="alert"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg><div><strong>Storms in the forecast.</strong> Thunder is expected within hours. Get off open water before it arrives — no fish is worth a lightning risk.</div></div>';
+  } else if(c.wind_gusts_10m>=28){
+    slot.innerHTML='<div class="alert calm"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h9a2.5 2.5 0 1 1-2.5 2.5"/></svg><div><strong>Strong gusts.</strong> Gusting to '+Math.round(c.wind_gusts_10m)+' mph — small craft and casting will be rough, especially on Lake Erie. Fish protected shorelines.</div></div>';
+  }
+  renderHours(d, idx);
+  renderPicks();
+}
+function fmtTime(d){ var h=d.getHours(), m=d.getMinutes(); var ap=h>=12?"p":"a"; h=h%12||12; return h+":"+(m<10?"0":"")+m+ap; }
+
+function renderHours(d, idx){
+  var h=d.hourly, wrap=$("#hours"), sum=$("#hoursSum");
+  if(!h.wind_speed_10m || !h.cloud_cover){ sum.textContent="Hourly outlook unavailable for this spot."; wrap.innerHTML=""; return; }
+  var SUN=[], DAYMAP={};
+  d.daily.time.forEach(function(ds,k){
+    var r=new Date(d.daily.sunrise[k]), s=new Date(d.daily.sunset[k]);
+    SUN.push(r.getTime()); SUN.push(s.getTime()); DAYMAP[ds]={r:r,s:s};
+  });
+  function score(i){
+    var press=h.surface_pressure;
+    var p3=(i>=3 && press[i-3]!=null)?(press[i]-press[i-3]):0;
+    var trend=p3<=-1.5?"falling":p3>=1.5?"rising":"steady";
+    var raw=h.time[i], t=new Date(raw), dkey=raw.slice(0,10);
+    var ll=1e9; for(var j=0;j<SUN.length;j++){ ll=Math.min(ll,Math.abs(SUN[j]-t.getTime())/60000); }
+    var pair=DAYMAP[dkey];
+    var isDay=pair?(t>=pair.r && t<=pair.s):(t.getHours()>=7 && t.getHours()<=19);
+    var cloud=h.cloud_cover[i], wind=h.wind_speed_10m[i], wc=h.weather_code[i];
+    return computeBite({trend:trend, lowLight:ll<=75, overcastDay:isDay&&cloud>=65&&ll>75, brightDay:isDay&&cloud<25&&ll>75, wind:wind, lightRain:[51,53,55,61,63,80,81].indexOf(wc)>=0, stormSoon:[95,96,99].indexOf(wc)>=0});
+  }
+  var N=Math.min(idx+16, h.time.length), arr=[];
+  for(var i=idx;i<N;i++){ var b=score(i); arr.push({i:i, t:new Date(h.time[i]), score:b.score, v:b.verdict}); }
+  if(!arr.length){ sum.textContent="Hourly outlook unavailable."; wrap.innerHTML=""; return; }
+  var best=arr[0]; arr.forEach(function(a){ if(a.score>best.score) best=a; });
+  wrap.innerHTML="";
+  arr.forEach(function(a){
+    var isNow=a.i===idx, isPeak=(a.i===best.i && best.score>=30 && !isNow);
+    var div=document.createElement('div'); div.className="hr"+(isNow?" now":"")+(isPeak?" peak":"");
+    var hgt=Math.round(12 + (a.score/100)*72);
+    div.innerHTML='<div class="s">'+a.score+'</div><div class="col"><div class="fill" style="height:'+hgt+'px;background:'+a.v[1]+'"></div></div><div class="t">'+(isNow?"Now":fmtHour(a.t))+'</div>';
+    wrap.appendChild(div);
+  });
+  if(best.score>=30){
+    sum.innerHTML='Best window ahead: <b>'+(best.i===idx?"right now":("around "+fmtHour(best.t)))+'</b> · '+best.v[0]+' ('+best.score+'). Bars show the bite hour by hour — scroll across.';
+  } else {
+    sum.innerHTML='Slow stretch ahead. <b>Early and late</b> are still your best odds — fish low light and any wind you can find.';
+  }
+}
+function fmtHour(d){ var h=d.getHours(), ap=h>=12?"p":"a"; h=h%12||12; return h+ap; }
+
+function setGauge(score, color){
+  var len = Math.PI*130; // semicircle path length
+  var f = score/100;
+  var fill=$("#fill");
+  fill.style.stroke=color;
+  fill.setAttribute("stroke-dasharray", len);
+  fill.setAttribute("stroke-dashoffset", len*(1-f));
+  fill.style.transition = "stroke-dashoffset .6s ease, stroke .3s";
+  // needle: theta from 180deg (left) to 0deg (right)
+  var theta = Math.PI - Math.PI*f;
+  var cx=160, cy=168, r=118;
+  var x2 = cx + r*Math.cos(theta);
+  var y2 = cy - r*Math.sin(theta);
+  var n=$("#needle"); n.setAttribute("x2",x2.toFixed(1)); n.setAttribute("y2",y2.toFixed(1));
+  n.style.transition="all .6s cubic-bezier(.34,1.3,.5,1)";
+  // ticks once
+  var tk=$("#ticks");
+  if(!tk.dataset.done){
+    [0,.25,.5,.75,1].forEach(function(t){
+      var th=Math.PI-Math.PI*t;
+      var x1=cx+128*Math.cos(th), y1=cy-128*Math.sin(th);
+      var xo=cx+138*Math.cos(th), yo=cy-138*Math.sin(th);
+      var l=document.createElementNS("http://www.w3.org/2000/svg","line");
+      l.setAttribute("x1",x1);l.setAttribute("y1",y1);l.setAttribute("x2",xo);l.setAttribute("y2",yo);
+      tk.appendChild(l);
+    });
+    tk.dataset.done="1";
+  }
+}
+
+/* ---------------- map ---------------- */
+var LAYERS = {
+  topo: {url:"https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}", attr:"USGS The National Map — Topo", max:16},
+  imagery: {url:"https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}", attr:"USGS The National Map — Imagery Topo", max:16},
+  street: {url:"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", attr:"© OpenStreetMap contributors", max:19}
+};
+function ensureMap(){
+  if(state.mapReady) { if(state.map) state.map.invalidateSize(); return; }
+  if(typeof L==="undefined"){
+    $("#map").innerHTML='<div style="padding:24px;text-align:center" class="muted">Map couldn\'t load (offline or blocked). The rest of Soundline still works. Reconnect and reopen this tab.</div>';
+    return;
+  }
+  state.map = L.map('map',{zoomControl:true}).setView([state.loc.lat,state.loc.lon],11);
+  setLayer(state.layerKey,true);
+  state.spotLayer = L.layerGroup().addTo(state.map);
+  state.map.on('click', function(e){ promptSpot(e.latlng.lat, e.latlng.lng); });
+  state.mapReady=true;
+  drawSpots();
+  setTimeout(function(){ state.map.invalidateSize(); },200);
+}
+function setLayer(key, silent){
+  state.layerKey=key;
+  $$('.seg button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.layer===key)); });
+  if(!state.map) return;
+  if(state.layer) state.map.removeLayer(state.layer);
+  var L1=LAYERS[key];
+  state.layer = L.tileLayer(L1.url,{attribution:L1.attr, maxZoom:L1.max}).addTo(state.map);
+}
+var SPOT_TYPES=[["Drop-off","#0E5A7D"],["Weed bed","#3C7A4E"],["Point","#B8860B"],["Inlet / creek","#2E8FB0"],["Structure","#E8731C"],["Ramp","#C42E2E"]];
+function promptSpot(lat,lon){
+  var label = window.prompt("Name this spot (e.g. North drop-off):","");
+  if(label===null) return;
+  label = label.trim() || "Spot";
+  var typeIdx = window.prompt("Type — enter a number:\n1 Drop-off  2 Weed bed  3 Point\n4 Inlet/creek  5 Structure  6 Ramp","1");
+  var ti = parseInt(typeIdx,10); if(isNaN(ti)||ti<1||ti>6) ti=5; ti=ti-1;
+  var sp={id:Date.now(), lat:lat, lon:lon, label:label, type:SPOT_TYPES[ti][0], color:SPOT_TYPES[ti][1]};
+  state.spots.push(sp); sset("spots",state.spots);
+  drawSpots(); renderSpotList();
+}
+function drawSpots(){
+  if(!state.spotLayer) return;
+  state.spotLayer.clearLayers();
+  state.spots.forEach(function(sp){
+    var m=L.circleMarker([sp.lat,sp.lon],{radius:9,color:"#fff",weight:2,fillColor:sp.color,fillOpacity:1});
+    m.bindPopup('<div class="spotpin"><b>'+escapeHTML(sp.label)+'</b><br>'+sp.type+'<br><span class="mono">'+sp.lat.toFixed(4)+', '+sp.lon.toFixed(4)+'</span></div>');
+    m.addTo(state.spotLayer);
+  });
+}
+function renderSpotList(){
+  var ul=$("#spotList"); ul.innerHTML="";
+  if(!state.spots.length){
+    ul.innerHTML='<li class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><div>No spots yet. Open the map and tap a drop-off, weed bed, or ramp to mark it.</div></li>';
+    return;
+  }
+  state.spots.slice().reverse().forEach(function(sp){
+    var li=document.createElement('li'); li.className="spotitem";
+    li.innerHTML='<span class="dot" style="background:'+sp.color+'"></span>'+
+      '<div class="meta"><b>'+escapeHTML(sp.label)+'</b><div class="sub">'+sp.type+' · <span class="mono">'+sp.lat.toFixed(4)+', '+sp.lon.toFixed(4)+'</span></div></div>'+
+      '<button class="iconbtn" aria-label="Go to '+escapeHTML(sp.label)+' on map"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></button>'+
+      '<button class="iconbtn" aria-label="Forecast at '+escapeHTML(sp.label)+'"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 16a4 4 0 0 1 1-7.9A5 5 0 0 1 16 8a3.5 3.5 0 0 1 1 6.9"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg></button>'+
+      '<button class="iconbtn danger" aria-label="Delete '+escapeHTML(sp.label)+'"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button>';
+    var btns=li.querySelectorAll('button');
+    btns[0].addEventListener('click', function(){ showTab('map'); ensureMap(); if(state.map) state.map.setView([sp.lat,sp.lon],14); });
+    btns[1].addEventListener('click', function(){ setLoc(sp.lat,sp.lon,sp.label); showTab('now'); });
+    btns[2].addEventListener('click', function(){ state.spots=state.spots.filter(function(x){return x.id!==sp.id;}); sset("spots",state.spots); drawSpots(); renderSpotList(); });
+    ul.appendChild(li);
+  });
+}
+
+/* ---------------- catch log ---------------- */
+function addCatch(){
+  var sp=$("#cSpecies").value.trim();
+  if(!sp){ $("#cSpecies").focus(); flashAlert("calm","Add a species","Enter what you caught to save the catch."); showTab('log'); return; }
+  var rec={
+    id:Date.now(),
+    species:sp,
+    len:parseFloat($("#cLen").value)||null,
+    wt:parseFloat($("#cWt").value)||null,
+    bait:$("#cBait").value.trim(),
+    water:$("#cWater").value.trim() || state.loc.name,
+    notes:$("#cNotes").value.trim(),
+    when:Date.now(),
+    cond:null
+  };
+  if($("#cAttach").checked && state.weather && state.weather.current){
+    var c=state.weather.current;
+    rec.cond={ t:Math.round(c.temperature_2m), w:Math.round(c.wind_speed_10m), wd:compass(c.wind_direction_10m), p:c.surface_pressure.toFixed(0) };
+  }
+  state.catches.push(rec); sset("catches",state.catches);
+  // reset
+  ["cSpecies","cLen","cWt","cBait","cNotes"].forEach(function(id){ $("#"+id).value=""; });
+  renderLog();
+  flashLog();
+}
+function flashLog(){
+  var b=$("#addCatch"); var old=b.innerHTML; b.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg> Saved';
+  setTimeout(function(){ b.innerHTML=old; },1200);
+}
+function renderLog(){
+  // stats
+  var s=$("#logStats");
+  var n=state.catches.length;
+  var biggest=state.catches.reduce(function(a,b){ return (b.len||0)>(a&&a.len||0)?b:a; }, null);
+  var species=new Set(state.catches.map(function(c){return c.species.toLowerCase();}));
+  s.innerHTML=
+    '<div class="stat"><div class="n">'+n+'</div><div class="l">Catches</div></div>'+
+    '<div class="stat"><div class="n">'+species.size+'</div><div class="l">Species</div></div>'+
+    '<div class="stat"><div class="n">'+(biggest&&biggest.len?biggest.len+'"':'—')+'</div><div class="l">Longest</div></div>';
+
+  var list=$("#logList");
+  if(!n){
+    list.innerHTML='<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14c2-3 5-3 7 0s5 3 7 0 4-3 4-3"/><path d="M16 7l4-2-1 4"/></svg><div>No catches logged yet. Land one and record it above — it saves on this device, signal or not.</div></div>';
+    return;
+  }
+  list.innerHTML="";
+  state.catches.slice().reverse().forEach(function(c){
+    var dt=new Date(c.when);
+    var size = c.len?(c.len+'"'):''; if(c.wt) size += (size?' · ':'')+c.wt+' lb';
+    var det=[c.bait,c.water].filter(Boolean).join(' · ');
+    var cond = c.cond? ('Pressure '+c.cond.p+' hPa · Wind '+c.cond.w+' mph '+c.cond.wd+' · '+c.cond.t+'°F') : '';
+    var div=document.createElement('div'); div.className="logitem";
+    div.innerHTML=
+      '<div class="h"><span class="sp">'+escapeHTML(c.species)+'</span><span class="size">'+size+'</span></div>'+
+      '<div class="when">'+dt.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' · '+fmtTime(dt)+(det?(' · '+escapeHTML(det)):'')+'</div>'+
+      (c.notes?'<div class="det">'+escapeHTML(c.notes)+'</div>':'')+
+      (cond?'<div class="cond">'+cond+'</div>':'')+
+      '<div style="text-align:right;margin-top:6px"><button class="iconbtn danger" aria-label="Delete catch" style="display:inline-grid"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div>';
+    div.querySelector('button').addEventListener('click', function(){
+      state.catches=state.catches.filter(function(x){return x.id!==c.id;}); sset("catches",state.catches); renderLog();
+    });
+    list.appendChild(div);
+  });
+}
+
+/* ---------------- scoring (shared) ---------------- */
+function computeBite(o){
+  var score=50, F=[];
+  if(o.trend==="falling"){ score+=20; F.push(["up","Pressure falling","Fronts moving in trigger active feeding."]); }
+  else if(o.trend==="rising"){ score-=14; F.push(["down","Pressure rising","Post-front bluebird slowdown is common."]); }
+  else { score+=2; F.push(["flat","Pressure steady","Neutral — read the other signals."]); }
+
+  if(o.lowLight){ score+=16; F.push(["up","Low-light window","Near sunrise or sunset — prime feeding."]); }
+  else if(o.overcastDay){ score+=8; F.push(["up","Overcast skies","Clouds keep fish loose and shallow longer."]); }
+  else if(o.brightDay){ score-=8; F.push(["down","Bright sun","Bluebird midday — go deeper or to shaded structure."]); }
+  else { F.push(["flat","Daylight","Standard conditions for the hour."]); }
+
+  var w=o.wind;
+  if(w>=4 && w<=14){ score+=12; F.push(["up","Working chop",Math.round(w)+" mph stirs bait and oxygen."]); }
+  else if(w<2){ score-=6; F.push(["down","Dead calm","Glassy water makes fish spooky."]); }
+  else if(w>22){ score-=12; F.push(["down","Heavy wind","Tough casting and control — mind safety."]); }
+  else { F.push(["flat","Light breeze",Math.round(w)+" mph — workable."]); }
+
+  if(o.lightRain){ score+=6; F.push(["up","Light rain","A little rain often turns fish on."]); }
+  if(o.stormSoon){ score-=10; }
+
+  score=Math.max(2,Math.min(98,Math.round(score)));
+  var v = score>=78?["Prime","var(--hot)"] : score>=55?["Good","var(--shallow)"] : score>=30?["Fair","var(--gold)"] : ["Slow","#6b7b85"];
+  return {score:score, verdict:v, factors:F};
+}
+function applyBite(b){
+  setGauge(b.score, b.verdict[1]);
+  $("#scoreNum").textContent=b.score; $("#scoreNum").style.color=b.verdict[1];
+  $("#verdict").textContent=b.verdict[0]; $("#verdict").style.color=b.verdict[1];
+  var fl=$("#factors"); fl.innerHTML="";
+  b.factors.forEach(function(f){
+    var li=document.createElement('li');
+    var sym=f[0]==="up"?"+":f[0]==="down"?"–":"=";
+    li.innerHTML='<span class="tag '+f[0]+'">'+sym+'</span><span><strong>'+f[1]+'</strong> — '+f[2]+'</span>';
+    fl.appendChild(li);
+  });
+}
+function updateWind(fromDir, w){
+  $("#windArrow").setAttribute("transform","rotate("+((fromDir+180)%360)+" 50 50)"); // arrow points the way wind travels
+  var toDir=compass(opp(fromDir)), fromC=compass(fromDir);
+  $("#windTip").innerHTML = w<2
+    ? "Near calm. Fish early or late, work shade and deeper edges, and downsize your presentation."
+    : "Wind is <strong>from the "+fromC+"</strong>, pushing baitfish toward the <strong>"+toDir+" shoreline</strong>. Set up on that windward bank and fish into the chop — active fish stack there.";
+}
+
+/* ---------------- manual conditions ---------------- */
+function revealManual(){ var m=$("#manualCard"); m.hidden=false; m.scrollIntoView({behavior:'smooth',block:'center'}); }
+function runManual(){
+  var sky=$("#mSky").value;
+  var w=parseFloat($("#mWind").value)||0;
+  var bite=computeBite({
+    trend:$("#mTrend").value,
+    lowLight: sky==="low",
+    overcastDay: sky==="overcast",
+    brightDay: sky==="bright",
+    wind:w, lightRain:$("#mRain").checked, stormSoon:false
+  });
+  applyBite(bite);
+  $("#alertSlot").innerHTML="";
+  var deg=Math.max(0,DIRS.indexOf($("#mDir").value))*22.5;
+  updateWind(deg, w);
+  var skyTxt={low:"Dawn/dusk",overcast:"Overcast",bright:"Bright",night:"Night"}[sky];
+  var trendTxt={falling:"Falling",steady:"Steady",rising:"Rising"}[$("#mTrend").value];
+  $("#metrics").innerHTML=
+    '<div class="metric"><div class="k">Wind</div><div class="v">'+Math.round(w)+' <small>mph '+$("#mDir").value+'</small></div></div>'+
+    '<div class="metric"><div class="k">Pressure</div><div class="v" style="font-size:17px">'+trendTxt+'</div></div>'+
+    '<div class="metric"><div class="k">Sky</div><div class="v" style="font-size:17px">'+skyTxt+'</div></div>'+
+    '<div class="metric"><div class="k">Source</div><div class="v" style="font-size:17px">Manual</div></div>';
+}
+
+/* ---------------- keep / release ---------------- */
+function getRule(species){
+  var s=(species||"").toLowerCase().trim();
+  if(/black bass|small.*bass|large.*bass|spotted bass/.test(s)) return {name:"black bass", min:12, bag:5, erie:"On Lake Erie, black bass carry a 14\" minimum and a spring closed/restricted season — verify the current dates."};
+  if(/walleye|saugeye|sauger/.test(s)) return {name:"walleye / saugeye / sauger", min:15, bag:6, minNote:"The 15\" minimum has been dropped on several inland lakes — confirm your specific water.", erie:"Lake Erie walleye limits are set yearly by zone (bag and minimum both vary) — check ODNR before keeping."};
+  if(/yellow perch|^perch$|perch/.test(s)) return {name:"yellow perch", min:0, bag:30, erie:"Lake Erie perch limits are set yearly by zone — verify the current daily bag."};
+  if(/musk|tiger/.test(s)) return {name:"muskellunge / tiger muskie", min:30, bag:1};
+  if(/steelhead|trout|salmon/.test(s)) return {name:"trout / salmon (inland)", min:0, bag:5, erie:"Lake Erie tributary steelhead have their own seasonal limits (often 2 fish) — check ODNR."};
+  if(/crappie|bluegill|sunfish|rock bass|panfish/.test(s)) return {name:"crappie & panfish", min:0, bag:null, generic:true};
+  if(/catfish|bullhead|drum|sheepshead|white bass|pike|carp|sucker|gar/.test(s)) return {name:s, min:0, bag:null, generic:true};
+  return null;
+}
+function bagLine(rule){ return rule.bag ? ("Daily bag: "+rule.bag+".") : (rule.generic ? "Daily bag varies by water — check your lake's rules." : ""); }
+function vbox(kind,head,sub){
+  return '<div class="verdict-box '+kind+'"><div class="vh">'+head+'</div><div class="sub">'+sub+'</div><div class="bag">Inland guidance, 2026–27 · measure flat, mouth to tail · ODNR is the final word</div></div>';
+}
+function runKeepRelease(){
+  var sp=$("#krSpecies").value.trim();
+  var len=parseFloat($("#krLen").value);
+  var box=$("#krResult");
+  if(!sp){ box.innerHTML=vbox("check","Pick a species","Type what you caught — the list will help."); return; }
+  var rule=getRule(sp);
+  if(!rule){ box.innerHTML=vbox("check","Not in the quick list","No rule of thumb here for &ldquo;"+escapeHTML(sp)+"&rdquo;. Check the ODNR digest for its size and bag limits before keeping."); return; }
+  if(state.krWater==="erie" && rule.erie){
+    box.innerHTML=vbox("check","Lake Erie — verify", rule.erie+" "+bagLine(rule)); return;
+  }
+  if(rule.min>0){
+    if(isNaN(len)){ box.innerHTML=vbox("check","Measure it first","Enter the length to compare against the "+rule.min+"\" minimum for "+rule.name+"."); return; }
+    if(len>=rule.min){
+      box.innerHTML=vbox("keep","Legal size — keep","At "+len+"\", this is at or over the "+rule.min+"\" minimum. "+(rule.minNote||"")+" "+bagLine(rule));
+    } else {
+      box.innerHTML=vbox("release","Under size — release","At "+len+"\", it's below the "+rule.min+"\" minimum — let it go gently. "+(rule.minNote||""));
+    }
+  } else {
+    box.innerHTML=vbox("neutral","No size minimum","There's no statewide size minimum for "+rule.name+", so it's legal by size. "+bagLine(rule)+" Keep only what you'll use.");
+  }
+}
+function setKrWater(w){
+  state.krWater=w;
+  $("#krInland").setAttribute('aria-pressed', String(w==="inland"));
+  $("#krErie").setAttribute('aria-pressed', String(w==="erie"));
+  if($("#krSpecies").value.trim()) runKeepRelease();
+}
+
+/* ---------------- where to start (season) ---------------- */
+var SEASONS={
+  spring:{label:"spring", picks:[
+    ["Crappie & bluegill","Slip bobber with a small minnow or worm, fished tight to shallow brush, docks, and flooded cover as the water warms."],
+    ["Saugeye & walleye","A jig tipped with a minnow or twister tail, worked slow below dams and along rocky points."],
+    ["Largemouth bass","Soft plastics or a spinnerbait around the first weeds and wood as bass move shallow."]
+  ]},
+  summer:{label:"summer", picks:[
+    ["Bluegill & bass","Topwater or a bobber-and-worm at dawn and dusk near cover; midday, go deeper or to shade."],
+    ["Channel catfish","Cut bait, chicken liver, or nightcrawlers on the bottom after dark — forgiving and hard-fighting."],
+    ["Crappie","Find them deeper now, around brush piles and bridge pilings, on small jigs."]
+  ]},
+  fall:{label:"fall", picks:[
+    ["Bass & walleye","Fish feed up for winter — crankbaits and jigs over points and flats, best on falling pressure."],
+    ["Crappie","Schools tighten around cover; a jig under a bobber fills the bucket."],
+    ["Saugeye","Reservoir saugeye turn on again — jigs and crankbaits near dams and current."]
+  ]},
+  winter:{label:"winter", picks:[
+    ["Saugeye","Below spillways and dams on slow jigs and blade baits — an Ohio cold-water staple."],
+    ["Panfish","Slow way down with small jigs deep; ice fish only where the ice is confirmed safe."],
+    ["Stocked trout","ODNR stocks ponds and lakes in cool months — PowerBait or small spinners off the bank."]
+  ]}
+};
+function currentSeason(){ var m=new Date().getMonth(); return m<=1?"winter":m<=4?"spring":m<=7?"summer":m<=10?"fall":"winter"; }
+function renderPicks(){
+  var key=$("#seasonSel").value || currentSeason();
+  var s=SEASONS[key]; if(!s) return;
+  var ul=$("#picks"); ul.innerHTML="";
+  s.picks.forEach(function(p,i){
+    var li=document.createElement('li'); li.className="pick";
+    li.innerHTML='<span class="pic">'+(i+1)+'</span><div><div class="pn">'+p[0]+'</div><div class="pd">'+p[1]+'</div></div>';
+    ul.appendChild(li);
+  });
+  var msg="Beginner-friendly targets for "+s.label+" on Ohio waters.";
+  if(state.weather && state.weather.current){
+    var c=state.weather.current;
+    if(c.is_day===0) msg+=" It's dark out — night catfishing is a great low-pressure way to start.";
+    else if(c.cloud_cover>=65) msg+=" Overcast right now, so fish will roam shallower and stay active longer.";
+    else if(c.cloud_cover<25) msg+=" Bright sun right now — fish shade, cover, and deeper water through midday.";
+  }
+  $("#startCtx").textContent=msg;
+}
+
+/* ---------------- util ---------------- */
+function escapeHTML(s){ return String(s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+function flashAlert(kind,title,msg){
+  showTab(document.querySelector('nav.tabs button[aria-selected="true"]').dataset.tab);
+  var slot=$("#alertSlot");
+  slot.innerHTML='<div class="alert '+(kind==='calm'?'calm':'')+'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><div><strong>'+escapeHTML(title)+'.</strong> '+msg+'</div></div>';
+}
+</script>
+</body>
+</html>
