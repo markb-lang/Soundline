@@ -136,6 +136,19 @@
   .chip{border:1.5px solid var(--line-strong);background:var(--paper2);border-radius:999px;padding:7px 12px;
     min-height:42px;display:inline-flex;align-items:center;gap:6px;font-size:14px}
   .chip.water{font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:15px}
+  /* saved-spot chip with delete (×) */
+  .chip.spotchip{padding:0;gap:0;align-items:stretch;overflow:hidden}
+  .chip.spotchip .spotchip-go{display:flex;align-items:center;background:none;border:0;
+    padding:0 8px 0 13px;font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:15px;color:inherit}
+  .chip.spotchip .spotchip-x{display:flex;align-items:center;justify-content:center;background:none;border:0;
+    border-left:1.5px solid var(--line);padding:0 11px;font-size:19px;line-height:1;color:var(--ink-soft)}
+  .chip.spotchip .spotchip-x:hover,.chip.spotchip .spotchip-x:focus-visible{color:var(--red);background:rgba(196,46,46,.10)}
+  /* save-this-spot button in the place header */
+  .savespot{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;
+    border:1.5px solid var(--deep-2);background:var(--deep);color:#fff;border-radius:999px;padding:7px 14px;min-height:40px;
+    font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:13px}
+  .savespot svg{flex:0 0 auto}
+  .savespot.saved{background:var(--green);border-color:var(--green)}
 
   /* ---------- bite gauge ---------- */
   .gauge-wrap{display:flex;flex-direction:column;align-items:center;text-align:center}
@@ -427,6 +440,10 @@
       <div class="place" id="placeHead">
         <span class="name display" id="placeName">Lake Erie — Cleveland</span>
         <span class="coords mono muted" id="placeCoords">41.51, -81.71</span>
+        <button class="savespot" id="saveLocBtn" type="button" aria-label="Save this location to your spots">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          Save this spot
+        </button>
       </div>
       <div class="chips" id="quickWaters" aria-label="Quick access"></div>
 
@@ -880,6 +897,10 @@ function bindControls(){
     if(state.map){ var c=state.map.getCenter(); openSpotSheet(c.lat, c.lng); }
   });
   $("#spSave").addEventListener('click', saveSpot);
+  $("#saveLocBtn").addEventListener('click', function(){
+    if(!state.loc) return;
+    openSpotSheet(state.loc.lat, state.loc.lon, state.loc.name);
+  });
   $("#spCancel").addEventListener('click', closeSpotSheet);
   $("#spotSheet").addEventListener('click', function(e){ if(e.target.id==='spotSheet') closeSpotSheet(); });
   $("#spName").addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); saveSpot(); } });
@@ -907,11 +928,19 @@ function buildQuickWaters(){
   geo.addEventListener('click', useGeo);
   wrap.appendChild(geo);
   state.spots.slice().reverse().forEach(function(sp){
-    var b=document.createElement('button');
-    b.className="chip water"; b.type="button"; b.textContent=sp.label||"Saved spot";
-    b.title="Go to "+(sp.label||"saved spot");
-    b.addEventListener('click', function(){ setLoc(sp.lat, sp.lon, sp.label||"Saved spot"); });
-    wrap.appendChild(b);
+    var lab=sp.label||"Saved spot";
+    var chip=document.createElement('span');
+    chip.className="chip water spotchip";
+    var go=document.createElement('button');
+    go.type="button"; go.className="spotchip-go"; go.textContent=lab;
+    go.title="Go to "+lab;
+    go.addEventListener('click', function(){ setLoc(sp.lat, sp.lon, lab); });
+    var del=document.createElement('button');
+    del.type="button"; del.className="spotchip-x"; del.innerHTML="&times;";
+    del.setAttribute('aria-label','Remove '+lab+' from saved spots');
+    del.addEventListener('click', function(e){ e.stopPropagation(); deleteSpot(sp.id, lab); });
+    chip.appendChild(go); chip.appendChild(del);
+    wrap.appendChild(chip);
   });
   if(!state.spots.length){
     var hint=document.createElement('span');
@@ -1329,11 +1358,11 @@ function setLayer(key, silent){
 }
 var SPOT_TYPES=[["Drop-off","#0E5A7D"],["Weed bed","#3C7A4E"],["Point","#B8860B"],["Inlet / creek","#2E8FB0"],["Structure","#E8731C"],["Ramp","#C42E2E"]];
 var pendingSpot=null, spType=4;
-function openSpotSheet(lat,lon){
+function openSpotSheet(lat,lon,name){
   pendingSpot={lat:lat,lon:lon}; spType=4;
-  $("#spName").value=""; buildSpotTypes();
+  $("#spName").value=name||""; buildSpotTypes();
   $("#spotSheet").hidden=false;
-  setTimeout(function(){ var n=$("#spName"); if(n) n.focus(); },60);
+  setTimeout(function(){ var n=$("#spName"); if(n){ n.focus(); n.select(); } },60);
 }
 function closeSpotSheet(){ $("#spotSheet").hidden=true; pendingSpot=null; }
 function buildSpotTypes(){
@@ -1355,6 +1384,12 @@ function saveSpot(){
   drawSpots(); renderSpotList(); buildQuickWaters();
   closeSpotSheet();
   if(state.map){ state.map.panTo([sp.lat,sp.lon]); }
+}
+function deleteSpot(id,label){
+  if(!window.confirm('Remove "'+(label||'this spot')+'" from your saved spots?')) return;
+  state.spots = state.spots.filter(function(x){ return x.id!==id; });
+  sset("spots",state.spots);
+  drawSpots(); renderSpotList(); buildQuickWaters();
 }
 function drawSpots(){
   if(!state.spotLayer) return;
@@ -1381,7 +1416,7 @@ function renderSpotList(){
     var btns=li.querySelectorAll('button');
     btns[0].addEventListener('click', function(){ showTab('map'); ensureMap(); if(state.map) state.map.setView([sp.lat,sp.lon],14); });
     btns[1].addEventListener('click', function(){ setLoc(sp.lat,sp.lon,sp.label); showTab('now'); });
-    btns[2].addEventListener('click', function(){ state.spots=state.spots.filter(function(x){return x.id!==sp.id;}); sset("spots",state.spots); drawSpots(); renderSpotList(); buildQuickWaters(); });
+    btns[2].addEventListener('click', function(){ deleteSpot(sp.id, sp.label); });
     ul.appendChild(li);
   });
 }
