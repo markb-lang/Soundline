@@ -1,71 +1,92 @@
-/* Soundline service worker — makes the app open offline.
-   If you change files later, bump CACHE (v1 -> v2) to force an update. */
-const CACHE = 'soundline-v14';
-const SHELL = [
-  '/', '/index.html', '/manifest.webmanifest',
-  '/icon-192.png', '/icon-512.png', '/maskable-512.png', '/apple-touch-icon.png'
+/* Soundline — service worker
+ * Bump CACHE on EVERY deploy so returning users fetch the new build.
+ * (Changing this file at all also triggers the browser to install the new
+ *  worker; the version string is what purges the old caches on activate.)
+ */
+const CACHE = 'soundline-v15';
+
+/* Local app shell + the static assets index.html actually references. */
+const PRECACHE = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icon-192.png',
+  '/apple-touch-icon.png'
 ];
 
-// Live data that should always come fresh from the network (never served stale).
-const LIVE = [
+/* Live-data hosts: always go to the network, never cache.
+ * Weather, water levels, and geocoding must be fresh. */
+const LIVE_HOSTS = [
   'api.open-meteo.com',
   'geocoding-api.open-meteo.com',
   'nominatim.openstreetmap.org',
-  'basemap.nationalmap.gov',
-  'tile.openstreetmap.org',
-  'waterservices.usgs.gov'
+  'photon.komoot.io',
+  'waterservices.usgs.gov',   // legacy NWIS (migration planned 2026)
+  'api.waterdata.usgs.gov'    // future OGC endpoint
 ];
 
-self.addEventListener('install', (e) => {
+self.addEventListener('install', function (e) {
   e.waitUntil(
-    caches.open(CACHE)
-      .then((c) => c.addAll(SHELL))
-      .then(() => self.skipWaiting())
-      .catch(() => self.skipWaiting())
+    caches.open(CACHE).then(function (c) {
+      // Add items individually: one missing file won't fail the whole install.
+      return Promise.allSettled(PRECACHE.map(function (u) { return c.add(u); }));
+    }).then(function () { return self.skipWaiting(); })
   );
 });
 
-self.addEventListener('activate', (e) => {
+self.addEventListener('activate', function (e) {
   e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
+    caches.keys().then(function (keys) {
+      return Promise.all(keys.map(function (k) {
+        if (k !== CACHE) { return caches.delete(k); }
+      }));
+    }).then(function () { return self.clients.claim(); })
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
+self.addEventListener('fetch', function (e) {
+  var req = e.request;
+  if (req.method !== 'GET') { return; }
+  var url = new URL(req.url);
 
-  let url;
-  try { url = new URL(req.url); } catch (_) { return; }
-
-  // Opening the app: try network, fall back to the cached page so it loads offline.
+  // 1) Page navigations -> network-first, fall back to cached shell when offline.
+  //    This is what makes a new deploy actually reach people.
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('/index.html', copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match('/index.html').then((hit) => hit || caches.match('/')))
+      fetch(req).then(function (res) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put('/', copy); });
+        return res;
+      }).catch(function () {
+        return caches.match('/').then(function (r) { return r || caches.match('/index.html'); });
+      })
     );
     return;
   }
 
-  // Live data hosts: let them hit the network normally (they fail gracefully offline).
-  if (LIVE.some((h) => url.hostname.includes(h))) return;
+  // 2) Live data APIs -> network only, no caching.
+  if (LIVE_HOSTS.indexOf(url.hostname) !== -1) {
+    e.respondWith(fetch(req).catch(function () { return new Response('', { status: 504 }); }));
+    return;
+  }
 
-  // Everything else (fonts, Leaflet, our icons/assets): serve from cache, then update it.
+  // 3) Map tiles -> network; don't pack the cache with thousands of tiles.
+  if (url.hostname.indexOf('tile.openstreetmap.org') !== -1) {
+    e.respondWith(fetch(req).catch(function () { return caches.match(req); }));
+    return;
+  }
+
+  // 4) Everything else (own static assets + stable CDN libs/fonts):
+  //    cache-first, then network, caching good responses for next time.
   e.respondWith(
-    caches.match(req).then((hit) => {
-      const network = fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+    caches.match(req).then(function (hit) {
+      return hit || fetch(req).then(function (res) {
+        if (res && (res.ok || res.type === 'opaque')) {
+          var copy = res.clone();
+          caches.open(CACHE).then(function (c) { c.put(req, copy); });
+        }
         return res;
-      }).catch(() => hit);
-      return hit || network;
+      }).catch(function () { return hit; });
     })
   );
 });

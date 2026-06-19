@@ -966,37 +966,100 @@ function renderPlace(){
 }
 
 /* ---------------- search / geo ---------------- */
+/* Relevance tiers so a search floats water + parks to the top and drops
+   transit/retail noise that fuzzy matching drags in. Lower tier = better. */
+var SEARCH_WATER={water:1,reservoir:1,lake:1,pond:1,river:1,stream:1,canal:1,wetland:1,bay:1,spring:1,marina:1,slipway:1,fishing:1,riverbank:1,dock:1};
+var SEARCH_PARK={park:1,nature_reserve:1,national_park:1,protected_area:1,recreation_ground:1,nature_park:1};
+var SEARCH_JUNK={bus_stop:1,platform:1,station:1,stop_position:1,mall:1,retail:1,supermarket:1,convenience:1,parking:1,fuel:1,place_of_worship:1,school:1,college:1,university:1,hospital:1,pharmacy:1,restaurant:1,fast_food:1,cafe:1,bar:1,pub:1,hotel:1,motel:1,bank:1,office:1,commercial:1,industrial:1,construction:1,clinic:1,dentist:1,kindergarten:1};
+function searchTier(g){
+  var k=(g._key||"").toLowerCase(), v=(g._val||"").toLowerCase();
+  if(k==="highway"||k==="railway"||k==="aeroway"||k==="shop"||k==="office"||k==="craft") return 9; // 9 = drop
+  if(SEARCH_JUNK[v]) return 9;
+  if(k==="waterway"||SEARCH_WATER[v]) return 0;          // water = top
+  if(SEARCH_PARK[v]) return 0;                           // parks / protected land = top
+  if(v==="camp_site"||v==="dog_park") return 1;
+  if(k==="place") return 1;                              // towns, villages, localities
+  return 2;                                              // other named features, still allowed
+}
 async function doSearch(){
   var q=$("#searchInput").value.trim(); if(!q) return;
   var btn=$("#searchForm button"); btn.disabled=true;
   showResults('<div class="res-msg">Searching parks, ponds, lakes &amp; towns…</div>');
+
+  // Bias every search toward where the angler is right now, so a park that shares
+  // its name across five states surfaces the nearby one first.
+  var bias = (state.loc && isFinite(state.loc.lat)) ? state.loc : {lat:39.5, lon:-98.35};
+
+  // Photon: fuzzy, typo-tolerant, and strong on named OSM features (parks, lakes,
+  // nature reserves, access points) — this is what was missing the named parks.
+  var photonURL = "https://photon.komoot.io/api/?lang=en&limit=10&lat="+bias.lat+"&lon="+bias.lon
+      + "&q="+encodeURIComponent(q);
+  // Nominatim: still great for towns/addresses. Soft viewbox nudge (unbounded), not a hard cutoff.
+  var dd=1.6, vb=[(bias.lon-dd),(bias.lat+dd),(bias.lon+dd),(bias.lat-dd)].join(",");
+  var nomURL = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&dedupe=1"
+      + "&limit=10&countrycodes=us&bounded=0&viewbox="+vb+"&q="+encodeURIComponent(q);
+
+  // Query both at once; one failing never blocks the other.
   var found=[];
-  try{
-    var u="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&countrycodes=us&q="+encodeURIComponent(q);
-    var r=await fetch(u,{headers:{"Accept":"application/json"}});
-    var d=await r.json();
-    found=(d||[]).map(function(it){
-      var a=it.address||{};
-      var nm=it.name || it.display_name.split(",")[0];
-      var sub=[a.city||a.town||a.village||a.hamlet||a.county, a.state].filter(Boolean).join(", ");
-      return {lat:parseFloat(it.lat), lon:parseFloat(it.lon), name:nm, sub:sub, kind:(it.type||it.category||"").replace(/_/g," ")};
+  var res=await Promise.allSettled([
+    fetch(photonURL).then(function(x){return x.json();}),
+    fetch(nomURL,{headers:{"Accept":"application/json"}}).then(function(x){return x.json();})
+  ]);
+
+  if(res[0].status==="fulfilled"){
+    var feats=(res[0].value && res[0].value.features) || [];
+    feats.forEach(function(f){
+      var p=f.properties||{}, c=(f.geometry&&f.geometry.coordinates)||[];
+      if(c.length<2) return;
+      if(p.countrycode && p.countrycode!=="US") return;   // keep results US, like the rest of the app
+      var nm=p.name || p.street; if(!nm) return;
+      var sub=[p.city||p.town||p.village||p.county, p.state].filter(Boolean).join(", ");
+      found.push({lat:c[1], lon:c[0], name:nm, sub:sub, kind:(p.osm_value||p.type||"").replace(/_/g," "), _key:p.osm_key, _val:p.osm_value});
     });
-  }catch(e){}
-  if(!found.length){
+  }
+  if(res[1].status==="fulfilled"){
+    (res[1].value||[]).forEach(function(it){
+      var a=it.address||{};
+      var nm=it.name || (it.display_name||"").split(",")[0];
+      var sub=[a.city||a.town||a.village||a.hamlet||a.county, a.state].filter(Boolean).join(", ");
+      found.push({lat:parseFloat(it.lat), lon:parseFloat(it.lon), name:nm, sub:sub, kind:(it.type||it.category||"").replace(/_/g," "), _key:it.category, _val:it.type});
+    });
+  }
+
+  // Merge the two sources: dedupe by name + ~110m grid.
+  var seen={}, merged=[];
+  found.forEach(function(g){
+    if(!g.name || isNaN(g.lat) || isNaN(g.lon)) return;
+    var key=g.name.toLowerCase()+"@"+g.lat.toFixed(3)+","+g.lon.toFixed(3);
+    if(seen[key]) return; seen[key]=1;
+    g._mi=distMiles(bias.lat, bias.lon, g.lat, g.lon);
+    g._r=searchTier(g);
+    merged.push(g);
+  });
+  // Drop transit/retail noise, but never wipe out the only matches we have.
+  var kept=merged.filter(function(g){ return g._r<9; });
+  if(!kept.length) kept=merged;
+  // Rank: water + parks first, then towns, then the rest — nearest-first within each.
+  kept.sort(function(x,y){ return (x._r*100000+x._mi)-(y._r*100000+y._mi); });
+  merged=kept.slice(0,8);
+
+  // Last resort only if both sources came back empty: Open-Meteo town gazetteer.
+  if(!merged.length){
     try{
       var r2=await fetch("https://geocoding-api.open-meteo.com/v1/search?count=6&language=en&format=json&name="+encodeURIComponent(q));
       var d2=await r2.json();
-      found=((d2&&d2.results)||[]).map(function(g){
+      merged=((d2&&d2.results)||[]).map(function(g){
         return {lat:g.latitude, lon:g.longitude, name:g.name, sub:[g.admin2,g.admin1].filter(Boolean).join(", "), kind:g.feature_code==="PPL"?"town":""};
       });
     }catch(e2){}
   }
+
   btn.disabled=false;
-  if(!found.length){
+  if(!merged.length){
     showResults('<div class="res-msg">No match for &ldquo;'+escapeHTML(q)+'&rdquo;. In this preview, outside searches are blocked &mdash; open the downloaded file in your browser, or use the <strong>Map</strong> tab to drop a pin on any pond and tap &ldquo;Conditions here.&rdquo;</div>');
     return;
   }
-  renderResults(found);
+  renderResults(merged);
 }
 function showResults(html){ var el=$("#searchResults"); el.innerHTML=html; el.hidden=false; }
 function hideResults(){ var el=$("#searchResults"); el.hidden=true; el.innerHTML=""; }
@@ -1004,7 +1067,9 @@ function renderResults(list){
   var el=$("#searchResults"); el.innerHTML="";
   list.forEach(function(g){
     var b=document.createElement('button'); b.type="button"; b.className="res-item"; b.setAttribute("role","option");
-    b.innerHTML='<span class="res-main"><b>'+escapeHTML(g.name)+'</b>'+(g.sub?'<span class="res-sub">'+escapeHTML(g.sub)+'</span>':'')+'</span>'+(g.kind?'<span class="tagpill">'+escapeHTML(g.kind)+'</span>':'');
+    var mi=(typeof g._mi==="number" && isFinite(g._mi)) ? (g._mi<10 ? g._mi.toFixed(1) : Math.round(g._mi))+" mi" : "";
+    var sub=[mi, g.sub].filter(Boolean).join(" · ");
+    b.innerHTML='<span class="res-main"><b>'+escapeHTML(g.name)+'</b>'+(sub?'<span class="res-sub">'+escapeHTML(sub)+'</span>':'')+'</span>'+(g.kind?'<span class="tagpill">'+escapeHTML(g.kind)+'</span>':'');
     b.addEventListener('click', function(){ setLoc(g.lat, g.lon, g.name); $("#searchInput").value=""; hideResults(); });
     el.appendChild(b);
   });
