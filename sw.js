@@ -3,7 +3,7 @@
  * (Changing this file at all also triggers the browser to install the new
  *  worker; the version string is what purges the old caches on activate.)
  */
-const CACHE = 'soundline-v17';
+const CACHE = 'soundline-v18';
 
 /* Local app shell + the static assets index.html actually references. */
 const PRECACHE = [
