@@ -380,6 +380,28 @@
 
   /* what to use here */
   .picks{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+  /* lures-to-try block */
+  .lures{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .lures li{display:flex;gap:10px;align-items:flex-start}
+  .lures .lb{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--accent,var(--green));margin-top:7px}
+  .lures .ln{font-weight:700}
+  .lures .lw{color:var(--ink-soft)}
+  #lureCtx{margin:10px 0 0}
+  /* "how we rate the bite" explainer */
+  .method{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+  .method>summary{cursor:pointer;font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;
+    letter-spacing:.06em;font-size:14px;color:var(--deep-2);list-style:none;display:flex;align-items:center;gap:8px}
+  .method>summary::-webkit-details-marker{display:none}
+  .method>summary::before{content:"+";font-weight:700;color:var(--deep);width:1em;text-align:center}
+  .method[open]>summary::before{content:"\2013"}
+  .method-body{font-size:14px;line-height:1.5;margin-top:8px}
+  .method-body p{margin:0 0 8px}
+  .method-body ul{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:9px}
+  .conf{display:inline-block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+    padding:1px 7px;border-radius:999px;margin-left:4px;vertical-align:middle}
+  .conf.strong{background:rgba(60,122,78,.16);color:var(--green)}
+  .conf.med{background:rgba(184,134,11,.18);color:var(--gold)}
+  .conf.weak{background:rgba(74,91,102,.15);color:var(--ink-soft)}
   .pick{display:flex;gap:12px;align-items:flex-start;background:var(--paper2);border:1.5px solid var(--line);border-radius:12px;padding:11px 13px}
   .pick .pic{flex:0 0 auto;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--deep);color:#fff;font-family:"Saira Condensed",system-ui,sans-serif;font-size:20px;font-weight:700}
   .pick .pn{font-family:"Saira Condensed",system-ui,sans-serif;font-size:17px;letter-spacing:.02em;color:var(--deep-2)}
@@ -518,6 +540,20 @@
         </div>
         <ul class="factors" id="factors"></ul>
         <p class="note">A read on conditions, not a promise. Pressure trends, low light, wind, and sky are weighed — fish, season, and water still have the final say. <button class="linkbtn" id="manualToggle">No signal? Enter conditions →</button></p>
+        <details class="method">
+          <summary>How Soundline rates the bite</summary>
+          <div class="method-body">
+            <p>The score blends conditions that experienced anglers and fish biology point to. It's a read on the odds, not a promise — fish, season, and the water always have the final say. Here's what goes in, and how far each is actually backed up:</p>
+            <ul>
+              <li><b>Light &amp; time of day</b> <span class="conf strong">strong</span><br>Most freshwater predators feed hardest at dawn, dusk, and under cloud, when low light favors the ambush.</li>
+              <li><b>Water temperature &amp; season</b> <span class="conf strong">strong</span><br>Temperature drives how active fish are and when they feed.</li>
+              <li><b>Wind</b> <span class="conf med">moderate</span><br>Steady wind pushes plankton and baitfish onto windward shores, and a light chop breaks up the surface.</li>
+              <li><b>Barometric pressure trend</b> <span class="conf med">mixed</span><br>A falling barometer ahead of a front is a classic trigger — though the science is less settled than the folklore.</li>
+              <li><b>Solunar (moon) timing</b> <span class="conf weak">tiebreaker</span><br>Moon-overhead and moonrise/set windows are a long-held tradition with limited hard evidence, so we use them only to sharpen <em>when</em>, never as the main call.</li>
+            </ul>
+            <p class="muted tiny">What's next: comparing your logged catches against the score at the time, so the forecast can start to show whether its better days really do fish better.</p>
+          </div>
+        </details>
       </div>
 
       <div class="card cat-plan" id="planCard">
@@ -587,6 +623,9 @@
         </div>
         <p class="muted tiny" id="startCtx" style="margin:-2px 0 10px"></p>
         <ul class="picks" id="picks"></ul>
+        <p class="eyebrow" style="margin-top:16px">Lures to try</p>
+        <ul class="lures" id="lures"></ul>
+        <p class="muted tiny" id="lureCtx"></p>
         <p class="note">New to it? The all-rounder: a slip bobber, a small split shot, a #6 hook, and a live nightcrawler fished near cover catches bluegill, perch, crappie, and more — almost anywhere, almost any season.</p>
       </div>
     </section>
@@ -1947,6 +1986,111 @@ function inferWaterType(name){
   return "lake";
 }
 function currentSeason(){ var m=new Date().getMonth(); return m<=1?"winter":m<=4?"spring":m<=7?"summer":m<=10?"fall":"winter"; }
+var LURES={
+  lake:{
+    spring:[
+      {l:"Spinnerbait (white / chartreuse)", w:"Covers warming shallows fast and pulls pre-spawn bass off weed edges and wood."},
+      {l:"Weightless or wacky-rigged stick worm", w:"Fished slow around the first shallow cover, it's deadly as fish move up."},
+      {l:"Small jig under a float", w:"Crappie and bluegill on brush and docks \u2014 tip with a minnow if they're fussy."}
+    ],
+    summer:[
+      {l:"Topwater frog or walker (low light)", w:"Explosive at dawn, dusk, and over weed mats when fish feed up top."},
+      {l:"Texas-rigged worm or creature bait", w:"Works cover and deeper edges through the midday sun."},
+      {l:"Crankbait on points and humps", w:"Reaches fish that slide deep when it's bright and hot."}
+    ],
+    fall:[
+      {l:"Lipless or squarebill crankbait", w:"Matches fleeing baitfish as fish feed up \u2014 burn it over flats and points."},
+      {l:"Spinnerbait or bladed jig", w:"Reaction strikes from aggressive fall fish, best on a falling barometer."},
+      {l:"Jig under a bobber", w:"Crappie schools tighten on cover; small vertical jigs fill a bucket."}
+    ],
+    winter:[
+      {l:"Blade bait or jigging spoon", w:"Compact and easy to fish slow and vertical for deep, lethargic fish."},
+      {l:"Drop-shot or finesse jig", w:"A subtle bottom presentation when fish barely move."},
+      {l:"Small tungsten jig (ice, where safe)", w:"Tip with a waxworm or minnow for deep panfish \u2014 only on confirmed safe ice."}
+    ]
+  },
+  river:{
+    spring:[
+      {l:"Jig tipped with a minnow or twister", w:"The walleye and sauger staple in current seams and below dams during the run."},
+      {l:"Small crankbait or tube", w:"Smallmouth around current breaks, rock, and eddies as water warms."},
+      {l:"Cut bait on the bottom", w:"Rising, warming flows turn catfish on in holes and behind cover."}
+    ],
+    summer:[
+      {l:"Topwater early, then a tube or grub", w:"Smallmouth hit up top at first light, then pull back to current-seam plastics."},
+      {l:"Inline spinner", w:"Flash and vibration trigger reaction strikes in moving, stained water."},
+      {l:"Live or cut bait in deep holes (after dark)", w:"Channels and flatheads feed at night in the slower, deeper stretches."}
+    ],
+    fall:[
+      {l:"Suspending jerkbait", w:"Smallmouth feed hard pre-winter \u2014 work it through deeper pools."},
+      {l:"Blade bait or vertical jig", w:"Walleye and sauger staging near wintering holes hit vertical presentations."},
+      {l:"Bottom bait in slow water", w:"Catfish keep feeding in the deeper, slower stretches before the cold."}
+    ],
+    winter:[
+      {l:"Blade bait or hair jig", w:"Below spillways and dams, worked slow \u2014 a cold-water sauger and walleye classic."},
+      {l:"Small nymph, egg, or spinner (trout tailwaters)", w:"Where trout hold, fish slow seams and soft water."},
+      {l:"Finesse jig in slack water", w:"Panfish tuck into deep, out-of-current pockets \u2014 go small and slow."}
+    ]
+  },
+  greatlake:{
+    spring:[
+      {l:"Cast jerkbait or trolled stickbait", w:"Walleye follow warming water to river mouths and shorelines."},
+      {l:"Perch rig with minnows", w:"Yellow perch school near structure \u2014 fish it near the bottom."},
+      {l:"Spawn sac, spinner, or trolled spoon", w:"Staging steelhead and trout near tributary mouths and harbors."}
+    ],
+    summer:[
+      {l:"Trolled crankbait or worm harness", w:"Open-water walleye following bait \u2014 cover water until you find them."},
+      {l:"Tube or drop-shot on rock", w:"Smallmouth on reefs, points, and breakwalls."},
+      {l:"Perch rig over flats", w:"Minnows on mud and gravel for schooling perch."}
+    ],
+    fall:[
+      {l:"Shallow stickbait (low light)", w:"Big fall walleye move shallow near shore \u2014 best at dawn, dusk, and after dark."},
+      {l:"Drift spawn, jig, or spinner (tributaries)", w:"Steelhead and salmon run the rivers \u2014 fish the current and seams."},
+      {l:"Blade bait or jig on rock", w:"Smallmouth feed hard on structure before winter."}
+    ],
+    winter:[
+      {l:"Jigging spoon or blade bait (harbors)", w:"Near-shore and harbor fish stay catchable in cold water."},
+      {l:"Small jigging spoon + minnow (ice, where safe)", w:"Perch through confirmed-safe ice."},
+      {l:"Float-fished bait or jig (tributaries)", w:"Steelhead hold in tributaries and harbors through the cold."}
+    ]
+  }
+};
+function lureTips(skey){
+  var tips=[];
+  var c=(state.weather && state.weather.current) || state.manualWx;
+  if(c){
+    if(c.is_day===0) tips.push("After dark: dark silhouettes (black, blue) and slow, steady retrieves the fish can track.");
+    else if(c.cloud_cover>=65) tips.push("Overcast now \u2014 lean on moving baits and brighter colors (chartreuse, white); fish are roaming.");
+    else if(c.cloud_cover<25) tips.push("Bright sun \u2014 go natural and translucent (shad, green pumpkin), downsize, and fish shade and depth.");
+    else tips.push("Mixed light \u2014 natural colors with a touch of flash are a safe middle ground.");
+    var w=c.wind_speed_10m;
+    if(typeof w==="number"){
+      if(w>=12) tips.push("There's a chop \u2014 add flash and vibration (bladed jig, spinnerbait, lipless crank) and fish the windblown bank.");
+      else if(w<=3) tips.push("Slick, calm water \u2014 downsize and slow down; finesse plastics draw more bites.");
+    }
+  }
+  var t=c && typeof c.temperature_2m==="number" ? c.temperature_2m : null;
+  if(t!==null){
+    if(t<50) tips.push("Cold water \u2014 shrink the profile and slow everything down.");
+    else if(t>=75) tips.push("Warm water \u2014 bigger profiles and faster retrieves draw reaction strikes.");
+  }else{
+    if(skey==="winter") tips.push("Cold-season pace \u2014 compact baits worked slow.");
+    else if(skey==="summer") tips.push("Warm-season pace \u2014 fish can chase bigger, faster presentations.");
+  }
+  return tips.slice(0,2);
+}
+function renderLures(wkey, skey){
+  var ul=$("#lures"); if(!ul) return;
+  var W=LURES[wkey]||LURES.lake;
+  var arr=W[skey]||W.summer;
+  ul.innerHTML="";
+  arr.forEach(function(it){
+    var li=document.createElement('li');
+    li.innerHTML='<span class="lb"></span><div><span class="ln">'+escapeHTML(it.l)+'</span> \u2014 <span class="lw">'+escapeHTML(it.w)+'</span></div>';
+    ul.appendChild(li);
+  });
+  var tips=lureTips(skey);
+  $("#lureCtx").textContent = tips.length ? ("Dial it in: "+tips.join(" ")) : "Adjust color and speed to the light and water as you go \u2014 starting points, not rules.";
+}
 function renderPicks(){
   var wkey=($("#waterSel")&&$("#waterSel").value)||inferWaterType(state.loc.name);
   var skey=($("#seasonSel")&&$("#seasonSel").value)||currentSeason();
@@ -1966,6 +2110,7 @@ function renderPicks(){
     else if(c.cloud_cover<25) msg+=" Bright sun right now — fish shade, cover, and deeper water through midday.";
   }
   $("#startCtx").textContent=msg;
+  renderLures(wkey, skey);
 }
 
 /* ---------------- game plan (synthesizes the other signals) ---------------- */
