@@ -102,9 +102,29 @@
   @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){.panel,*{animation:none!important;transition:none!important}}
 
-  .card{background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin:0 0 14px}
+  .card{position:relative;overflow:hidden;background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin:0 0 14px}
   .card h2{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;
     font-size:20px;margin:0 0 10px;display:flex;align-items:center;gap:8px;color:var(--deep-2)}
+
+  /* ---- card differentiation: a colored edge + tinted heading per theme ---- */
+  /* blue = core readings · teal = water · orange = days ahead · gold = sky/timing
+     green = strategy · slate = manual input */
+  .card[class*="cat-"]::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent,var(--deep))}
+  .cat-core{--accent:var(--deep)}
+  .cat-water{--accent:var(--shallow)}
+  .cat-time{--accent:var(--hot)}
+  .cat-sky{--accent:var(--gold)}
+  .cat-plan{--accent:var(--green)}
+  .cat-input{--accent:var(--ink-soft)}
+  .card[class*="cat-"] h2, .card[class*="cat-"] .eyebrow{color:var(--accent)}
+
+  /* ---- hero: today's headline card ---- */
+  .card.hero{padding-top:20px;border:1.5px solid var(--deep);
+    background:linear-gradient(180deg,var(--paper2),var(--card) 64%);
+    box-shadow:0 2px 0 var(--line),0 20px 36px -18px rgba(9,58,82,.7)}
+  .card.hero::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;
+    background:linear-gradient(90deg,var(--hot),var(--gold))}
+  .card.hero h2{font-size:24px;color:var(--deep-2)}
   .eyebrow{font-family:"Saira Condensed",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.14em;
     font-size:12px;color:var(--ink-soft);margin:0 0 4px}
   .muted{color:var(--ink-soft)}
@@ -413,9 +433,9 @@
         <h1 class="display">Soundline</h1>
         <p>Read the water before you wet a line</p>
       </div>
-      <button class="sun-toggle" id="sunBtn" aria-pressed="false" aria-label="Toggle high-sun high-contrast mode">
+      <button class="sun-toggle" id="sunBtn" aria-pressed="false" aria-label="Toggle glare mode — a high-contrast view for bright sunlight" title="High-contrast view for bright sunlight">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
-        <span>Sun</span>
+        <span>Glare</span>
       </button>
     </div>
   </header>
@@ -449,7 +469,7 @@
 
       <div id="alertSlot"></div>
 
-      <div class="card" id="manualCard" hidden>
+      <div class="card cat-input" id="manualCard" hidden>
         <h2>Enter conditions</h2>
         <p class="tiny muted" style="margin:-4px 0 12px">No signal? Read these off the sky and water and Soundline still rates the bite.</p>
         <div class="grid2">
@@ -466,7 +486,7 @@
         <button class="btn block" id="mGo">Rate the bite</button>
       </div>
 
-      <div class="card">
+      <div class="card cat-core">
         <p class="eyebrow">Bite forecast — right now</p>
         <div class="gauge-wrap">
           <svg class="gauge" id="gauge" viewBox="0 0 320 188" role="img" aria-labelledby="gaugeTitle">
@@ -500,23 +520,23 @@
         <p class="note">A read on conditions, not a promise. Pressure trends, low light, wind, and sky are weighed — fish, season, and water still have the final say. <button class="linkbtn" id="manualToggle">No signal? Enter conditions →</button></p>
       </div>
 
-      <div class="card" id="planCard">
+      <div class="card cat-plan" id="planCard">
         <p class="eyebrow">Your game plan</p>
         <div id="planBody"><p class="muted tiny" style="margin:0">Building your plan from the forecast…</p></div>
       </div>
 
-      <div class="card" id="hoursCard">
+      <div class="card hero" id="hoursCard">
         <h2>When to go today</h2>
         <p class="hours-sum" id="hoursSum"><span class="skeleton" style="display:block;width:70%"></span></p>
         <div class="hours" id="hours" role="img" aria-label="Hourly bite forecast for the next several hours"></div>
       </div>
 
-      <div class="card" id="outlookCard">
+      <div class="card cat-time" id="outlookCard">
         <h2>Next few days</h2>
         <div id="outlookBody"><p class="muted tiny" style="margin:0">Building the outlook…</p></div>
       </div>
 
-      <div class="card" id="solCard" hidden>
+      <div class="card cat-sky" id="solCard" hidden>
         <p class="eyebrow">Feeding times — today</p>
         <div class="sol-head">
           <svg class="sol-moon" id="solMoon" width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Moon phase"></svg>
@@ -532,17 +552,17 @@
         <p class="note"><b>How to use it:</b> aim a trip at one of these windows — a window that also lands at dawn or dusk (flagged ★) is the strongest call. <b>Majors</b> (~2 hrs) are when the moon is directly overhead or underfoot; <b>minors</b> (~1 hr) are moonrise and moonset. These windows are already factored into your bite score and the hourly bars above. Solunar is a timing aid, not a guarantee — it's most useful as a tiebreaker, and sharpest near the new and full moon. Works offline.</p>
       </div>
 
-      <div class="card">
+      <div class="card cat-core">
         <h2>Conditions</h2>
         <div class="metrics" id="metrics"></div>
       </div>
 
-      <div class="card" id="waterCard">
+      <div class="card cat-water" id="waterCard">
         <h2>Water conditions</h2>
         <div id="waterBody"><p class="muted tiny" style="margin:0"><span class="skeleton" style="display:block;width:70%"></span></p></div>
       </div>
 
-      <div class="card">
+      <div class="card cat-sky">
         <h2>Wind &amp; where to fish</h2>
         <div class="wind-row">
           <svg class="compass" id="compass" viewBox="0 0 100 100" role="img" aria-label="Wind direction compass">
@@ -559,7 +579,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card cat-plan">
         <h2>Where to start here</h2>
         <div class="grid2" style="margin-bottom:10px">
           <label class="field"><span class="lab">Water type</span><select id="waterSel"></select></label>
