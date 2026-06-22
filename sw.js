@@ -3,7 +3,7 @@
  * (Changing this file at all also triggers the browser to install the new
  *  worker; the version string is what purges the old caches on activate.)
  */
-const CACHE = 'soundline-v20';
+const CACHE = 'soundline-v21';
 
 /* Local app shell + the static assets index.html actually references. */
 const PRECACHE = [
@@ -48,6 +48,8 @@ self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') { return; }
   var url = new URL(req.url);
+  // Ignore non-http(s) schemes (e.g. chrome-extension://) — the Cache API can't store them.
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') { return; }
 
   // 1) Page navigations -> network-first, fall back to cached shell when offline.
   //    This is what makes a new deploy actually reach people.
@@ -70,9 +72,15 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
-  // 3) Map tiles -> network; don't pack the cache with thousands of tiles.
-  if (url.hostname.indexOf('tile.openstreetmap.org') !== -1) {
-    e.respondWith(fetch(req).catch(function () { return caches.match(req); }));
+  // 3) Map tiles (OSM + USGS basemap) -> network-first; don't pack the cache with thousands
+  //    of tiles, and never serve a stale tile. Fall back to cache, then a clean error response.
+  if (url.hostname.indexOf('tile.openstreetmap.org') !== -1 ||
+      url.hostname === 'basemap.nationalmap.gov') {
+    e.respondWith(
+      fetch(req).catch(function () {
+        return caches.match(req).then(function (r) { return r || Response.error(); });
+      })
+    );
     return;
   }
 
@@ -86,7 +94,7 @@ self.addEventListener('fetch', function (e) {
           caches.open(CACHE).then(function (c) { c.put(req, copy); });
         }
         return res;
-      }).catch(function () { return hit; });
+      }).catch(function () { return hit || Response.error(); });
     })
   );
 });
