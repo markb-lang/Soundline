@@ -257,6 +257,9 @@
   .sheet-actions{display:flex;gap:10px}
   .sheet-actions .btn{flex:1}
   .leaflet-container{font-family:inherit}
+  /* Leaflet 1.9.x ships mix-blend-mode:plus-lighter on tiles, which renders them
+     invisible on Chrome. Force normal blending so map tiles actually show. */
+  .leaflet-container img.leaflet-tile{mix-blend-mode:normal!important}
   .tag-oh{display:inline-block;font-family:"Saira Condensed",system-ui,sans-serif;font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--deep);color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle;margin-left:6px}
   .spotpin{font-size:13px;line-height:1.4}
   .spotpin b{font-family:"Saira Condensed",system-ui,sans-serif;letter-spacing:.03em;font-size:15px}
