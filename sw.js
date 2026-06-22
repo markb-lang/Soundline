@@ -3,7 +3,7 @@
  * (Changing this file at all also triggers the browser to install the new
  *  worker; the version string is what purges the old caches on activate.)
  */
-const CACHE = 'soundline-v18';
+const CACHE = 'soundline-v19';
 
 /* Local app shell + the static assets index.html actually references. */
 const PRECACHE = [
@@ -81,7 +81,7 @@ self.addEventListener('fetch', function (e) {
   e.respondWith(
     caches.match(req).then(function (hit) {
       return hit || fetch(req).then(function (res) {
-        if (res && (res.ok || res.type === 'opaque')) {
+        if (res && res.ok && res.type !== 'opaque') {
           var copy = res.clone();
           caches.open(CACHE).then(function (c) { c.put(req, copy); });
         }
